@@ -1,7 +1,5 @@
-# For Korean font support (especially for plotly charts or matplotlib if added later)
-fonts-nanum
-fonts-nanum-coding
-fonts-nanum-extra
-
-# For Excel compatibility (often needed in some environments)
-default-jdk
+build-essential
+pkg-config
+libhdf5-dev
+libssl-dev
+libffi-dev
