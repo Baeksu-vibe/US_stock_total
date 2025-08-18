@@ -12,4 +12,5 @@ pytrends>=4.8.0
 youtube-transcript-api>=0.6.0
 python-dateutil>=2.8.0
 typing-extensions>=4.5.0
+prophet>=1.1.4
 
