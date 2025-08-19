@@ -4476,9 +4476,9 @@ def main():
                     col1, col2, col3 = st.columns([1, 2, 1])
                     
                     with col1:
-                        # 영상 정보 (썸네일 크기 유지)
+                        # 영상 정보 (썸네일 크기 조정 - 클라우드 환경 최적화)
                         try:
-                            st.image(video['thumbnail_url'], width=480)  # 원래 크기 유지
+                            st.image(video['thumbnail_url'], width=320)  # 480에서 280으로 축소
                         except:
                             st.error("썸네일 로드 실패")
                         
@@ -5244,3 +5244,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
