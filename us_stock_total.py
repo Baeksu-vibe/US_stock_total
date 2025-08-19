@@ -4465,12 +4465,20 @@ def main():
                 
                 # 각 영상을 expandable 섹션으로
                 with st.expander(f"📺 {idx+1}. {video['title'][:80]}{'...' if len(video['title']) > 80 else ''}", expanded=False):
+                    
+                    # 요약 상태를 가장 먼저 표시 (썸네일과 겹치지 않도록)
+                    summary_key = f"summary_{video_id}"
+                    
+                    if summary_key not in st.session_state.video_summaries:
+                        st.info("🔄 요약을 시작하려면 아래 오른쪽의 '🚀 요약 시작' 버튼을 클릭하세요.")
+                        st.markdown("---")  # 구분선 추가
+                    
                     col1, col2, col3 = st.columns([1, 2, 1])
                     
                     with col1:
-                        # 영상 정보
+                        # 영상 정보 (썸네일 크기 유지)
                         try:
-                            st.image(video['thumbnail_url'], width=480)
+                            st.image(video['thumbnail_url'], width=480)  # 원래 크기 유지
                         except:
                             st.error("썸네일 로드 실패")
                         
@@ -4482,8 +4490,6 @@ def main():
                     
                     with col2:
                         # 요약 결과 표시
-                        summary_key = f"summary_{video_id}"
-                        
                         if summary_key in st.session_state.video_summaries:
                             summary_data = st.session_state.video_summaries[summary_key]
                             
@@ -4503,12 +4509,21 @@ def main():
                                 if not summary_data.get('had_api_key'):
                                     st.info("💡 OpenAI API 키를 입력하시면 AI 기반 요약 분석을 받으실 수 있습니다.")
                         else:
-                            st.info("🔄 요약을 시작하려면 옆의 '🚀 요약 시작' 버튼을 클릭하세요.")
+                            st.markdown("### 📋 영상 분석 대기중")
+                            st.write("이 영상에 대한 상세 분석을 원하시면 오른쪽의 '요약 시작' 버튼을 클릭해주세요.")
+                            st.write("**분석 내용:**")
+                            st.write("• 영상 자막 추출")
+                            st.write("• AI 기반 핵심 내용 요약")
+                            st.write("• 투자 포인트 자동 추출")
+                            st.write("• 리스크 요인 식별")
                     
                     with col3:
+                        st.markdown("### 🎮 분석 제어")
+                        
                         # 액션 버튼들
                         if f"summary_{video_id}" not in st.session_state.video_summaries:
                             with st.form(f"analyze_form_{video_id}"):
+                                st.markdown("**분석 시작**")
                                 analyze_button = st.form_submit_button(f"🚀 요약 시작", use_container_width=True, type="primary")
                                 
                                 if analyze_button:
@@ -4558,9 +4573,19 @@ def main():
                                         
                                         st.rerun()
                         else:
-                            # 이미 요약됨 - 새로고침 버튼
+                            # 이미 요약됨 - 상태 표시 및 새로고침 버튼
+                            summary_data = st.session_state.video_summaries[f"summary_{video_id}"]
+                            
+                            if summary_data['type'] == 'gpt_summary':
+                                st.success("✅ AI 분석 완료")
+                            elif summary_data['type'] == 'error':
+                                st.error("❌ 분석 실패")
+                            else:
+                                st.info("📝 기본 분석 완료")
+                            
                             with st.form(f"refresh_form_{video_id}"):
-                                refresh_button = st.form_submit_button(f"🔄 다시 요약", use_container_width=True)
+                                st.markdown("**다시 분석**")
+                                refresh_button = st.form_submit_button(f"🔄 재분석", use_container_width=True)
                                 
                                 if refresh_button:
                                     if f"summary_{video_id}" in st.session_state.video_summaries:
@@ -4572,7 +4597,8 @@ def main():
                         
                         # 삭제 버튼
                         with st.form(f"remove_form_{video_id}"):
-                            remove_button = st.form_submit_button(f"🗑️ 목록에서 제거", use_container_width=True, type="secondary")
+                            st.markdown("**목록 관리**")
+                            remove_button = st.form_submit_button(f"🗑️ 제거", use_container_width=True, type="secondary")
                             
                             if remove_button:
                                 if video_id in st.session_state.selected_videos:
