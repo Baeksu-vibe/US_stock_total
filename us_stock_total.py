@@ -4174,9 +4174,9 @@ def main():
 
     # 유튜브 분석 탭 개선 코드 (tab8 부분만)
     with tab8:
-        st.header('📺 유튜브 영상 분석 (향상된 버전)')
+        st.header('📺 유튜브 영상 분석')
         
-        # 세션 상태 초기화 - 더 안정적인 방법
+        # 세션 상태 초기화
         if 'selected_videos' not in st.session_state:
             st.session_state.selected_videos = {}
         if 'video_summaries' not in st.session_state:
@@ -4200,55 +4200,24 @@ def main():
         # 검색 섹션
         st.subheader('🔍 유튜브 검색')
         
-        # 검색 설정
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            # 검색 폼 사용하여 자동 재로드 방지
-            with st.form("youtube_search_form"):
-                search_query = st.text_input(
-                    "검색어를 입력하세요",
-                    value=st.session_state.last_search_query,
-                    placeholder="예: AAPL 주식 분석, 애플 투자 전망, 테슬라 실적 분석",
-                    help="주식 종목명이나 투자 관련 키워드를 입력하세요"
-                )
-                
-                # 검색 옵션
-                search_col1, search_col2 = st.columns(2)
-                
-                with search_col1:
-                    max_results = st.selectbox(
-                        "검색 결과 수",
-                        [20, 30, 50, 100],
-                        index=1,
-                        help="더 많은 결과를 원하시면 큰 숫자를 선택하세요"
-                    )
-                
-                with search_col2:
-                    initial_sort = st.selectbox(
-                        "초기 정렬",
-                        ["관련도", "최신순", "조회수순", "평점순"],
-                        help="검색 시 적용할 기본 정렬 방식"
-                    )
-                
-                search_button = st.form_submit_button("🔍 검색", use_container_width=True)
-        
-        with col2:
-            st.info("""
-            **🆕 새로운 기능:**
-            • 검색 결과 최대 100개
-            • 조회수/업로드일/재생시간 필터
-            • 다양한 정렬 옵션
-            • 실시간 필터링
-            """)
-        
-        # 정렬 옵션 매핑
-        sort_mapping = {
-            "관련도": "relevance",
-            "최신순": "upload_date", 
-            "조회수순": "view_count",
-            "평점순": "rating"
-        }
+        # 검색 설정 - 간소화
+        with st.form("youtube_search_form"):
+            search_query = st.text_input(
+                "검색어를 입력하세요",
+                value=st.session_state.last_search_query,
+                placeholder="예: AAPL 주식 분석, 애플 투자 전망, 테슬라 실적 분석",
+                help="주식 종목명이나 투자 관련 키워드를 입력하세요"
+            )
+            
+            # 검색 결과 수만 유지
+            max_results = st.selectbox(
+                "검색 결과 수",
+                [20, 30, 50, 100],
+                index=1,
+                help="더 많은 결과를 원하시면 큰 숫자를 선택하세요"
+            )
+            
+            search_button = st.form_submit_button("🔍 검색", use_container_width=True)
         
         # 검색 실행
         if search_button and search_query:
@@ -4257,186 +4226,217 @@ def main():
                     videos = YouTubeAnalyzer.search_youtube_videos(
                         search_query, 
                         max_results=max_results,
-                        sort_order=sort_mapping[initial_sort]
+                        sort_order="relevance"  # 기본 관련도 정렬
                     )
                     st.session_state.search_results = videos
-                    st.session_state.filtered_results = videos  # 초기엔 필터링 안 함
+                    st.session_state.filtered_results = videos
                     st.session_state.last_search_query = search_query
                 st.success(f"✅ '{search_query}' 검색 완료! {len(videos)}개 영상 발견")
         
-        # 필터 및 정렬 섹션
+        # 고급 정렬 (검색 결과가 있을 때만 표시)
         if st.session_state.search_results:
-            st.markdown("---")
-            st.subheader('🎛️ 고급 필터 및 정렬')
-            
-            # 필터 컨트롤
-            filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
-            
-            with filter_col1:
-                st.write("**📊 조회수 필터**")
-                min_views = st.selectbox(
-                    "최소 조회수",
-                    [0, 1000, 10000, 100000, 1000000],
-                    format_func=lambda x: f"{x:,}회" if x > 0 else "제한 없음"
-                )
-            
-            with filter_col2:
-                st.write("**📅 업로드 기간**")
-                max_days = st.selectbox(
-                    "최대 업로드 전",
-                    [999999, 1, 7, 30, 90, 365],
-                    index=0,
-                    format_func=lambda x: "전체 기간" if x == 999999 else f"{x}일 전"
-                )
-            
-            with filter_col3:
-                st.write("**⏱️ 재생시간 범위**")
-                duration_range = st.selectbox(
-                    "영상 길이",
-                    ["전체", "짧음 (4분 이하)", "보통 (4-20분)", "김 (20분 이상)"]
-                )
+            with st.expander('🎛️ 고급 정렬', expanded=False):
+                col1, col2 = st.columns(2)
                 
-                # 재생시간 범위를 초로 변환
-                if duration_range == "짧음 (4분 이하)":
-                    min_dur, max_dur = 0, 240
-                elif duration_range == "보통 (4-20분)":
-                    min_dur, max_dur = 240, 1200
-                elif duration_range == "김 (20분 이상)":
-                    min_dur, max_dur = 1200, 999999
-                else:
-                    min_dur, max_dur = 0, 999999
-            
-            with filter_col4:
-                st.write("**🔄 정렬 방식**")
-                sort_by = st.selectbox(
-                    "정렬 기준",
-                    ["관련도", "조회수순", "최신순", "재생시간순"],
-                    help="필터링된 결과를 다시 정렬합니다"
-                )
+                with col1:
+                    sort_by = st.selectbox(
+                        "정렬 기준",
+                        ["관련도", "조회수", "최신순", "재생시간"],
+                        help="검색된 결과를 다시 정렬합니다"
+                    )
+                
+                with col2:
+                    # 관련도는 내림차순만 의미있으므로 정렬 방향 옵션 제한
+                    if sort_by == "관련도":
+                        sort_order = st.selectbox(
+                            "정렬 방향",
+                            ["높은 순"],
+                            help="관련도는 높은 순만 가능합니다",
+                            disabled=True
+                        )
+                        sort_ascending = False
+                    else:
+                        sort_order = st.selectbox(
+                            "정렬 방향",
+                            ["높은 순 (내림차순)", "낮은 순 (오름차순)"],
+                            help="정렬 방향을 선택하세요"
+                        )
+                        sort_ascending = "낮은 순" in sort_order
                 
                 sort_mapping_filter = {
                     "관련도": "relevance",
-                    "조회수순": "view_count",
+                    "조회수": "view_count",
                     "최신순": "upload_date", 
-                    "재생시간순": "duration"
+                    "재생시간": "duration"
                 }
+                
+                if st.button("🔄 정렬 적용", use_container_width=True, type="primary"):
+                    with st.spinner("정렬 중..."):
+                        videos_to_sort = st.session_state.search_results.copy()
+                        
+                        # direction_text 먼저 정의
+                        direction_text = "높은 순" if not sort_ascending else "낮은 순"
+                        
+                        if sort_by == "관련도":
+                            # 관련도는 기본 순서 유지
+                            sorted_videos = videos_to_sort
+                            
+                        elif sort_by == "조회수":
+                            # 조회수 정렬 - 완전히 새로운 방식으로 처리
+                            st.write("**🔍 조회수 정렬 디버깅:**")
+                            
+                            # 모든 영상의 조회수 정보 수집
+                            view_data = []
+                            for i, video in enumerate(videos_to_sort):
+                                view_text = video.get('view_count', '')
+                                view_num = video.get('view_count_num', 0)
+                                
+                                # view_count 텍스트에서 숫자 추출
+                                extracted_num = 0
+                                if view_text:
+                                    import re
+                                    # 모든 숫자와 단위 패턴 찾기
+                                    view_str = str(view_text).lower().replace(',', '').replace(' ', '')
+                                    
+                                    # K, M, B 단위 처리
+                                    if 'k' in view_str:
+                                        num_match = re.search(r'([\d\.]+)k', view_str)
+                                        if num_match:
+                                            extracted_num = int(float(num_match.group(1)) * 1000)
+                                    elif 'm' in view_str:
+                                        num_match = re.search(r'([\d\.]+)m', view_str)
+                                        if num_match:
+                                            extracted_num = int(float(num_match.group(1)) * 1000000)
+                                    elif 'b' in view_str:
+                                        num_match = re.search(r'([\d\.]+)b', view_str)
+                                        if num_match:
+                                            extracted_num = int(float(num_match.group(1)) * 1000000000)
+                                    else:
+                                        # 일반 숫자 추출 (한국어 "회" 포함)
+                                        num_match = re.search(r'(\d+)', view_str.replace('회', ''))
+                                        if num_match:
+                                            extracted_num = int(num_match.group(1))
+                                
+                                # 추출한 숫자를 다시 video 데이터에 저장
+                                video['extracted_view_count'] = extracted_num
+                                view_data.append((i, video['title'][:30], view_text, view_num, extracted_num))
+                            
+                            # 디버깅 정보 표시 (상위 10개만)
+                            st.write("상위 10개 영상의 조회수 추출 결과:")
+                            for idx, title, view_text, view_num, extracted in view_data[:10]:
+                                st.write(f"{idx+1}. {title}... | 텍스트: '{view_text}' | 숫자: {view_num} | 추출: {extracted:,}")
+                            
+                            # 추출한 숫자로 정렬
+                            sorted_videos = sorted(videos_to_sort, 
+                                                key=lambda x: x.get('extracted_view_count', 0), 
+                                                reverse=not sort_ascending)
+                            
+                            # 정렬 결과 확인
+                            st.write(f"\n정렬 후 상위 5개 ({direction_text}):")
+                            for i, video in enumerate(sorted_videos[:5]):
+                                extracted = video.get('extracted_view_count', 0)
+                                st.write(f"{i+1}. {video['title'][:30]}... - {extracted:,}회")
+                            
+                        elif sort_by == "최신순":
+                            sorted_videos = sorted(videos_to_sort, 
+                                                key=lambda x: x.get('published_days_ago', 999999), 
+                                                reverse=sort_ascending)
+                        elif sort_by == "재생시간":
+                            sorted_videos = sorted(videos_to_sort, 
+                                                key=lambda x: x.get('duration_seconds', 0), 
+                                                reverse=not sort_ascending)
+                        else:
+                            sorted_videos = videos_to_sort
+                        
+                        # 세션 상태 업데이트
+                        st.session_state.filtered_results = sorted_videos
+                    
+                    st.success(f"✅ {sort_by} {direction_text} 정렬 완료!")
+                    
+                    # 결과 즉시 반영
+                    st.rerun()
             
-            # 필터 적용 버튼
-            if st.button("🎯 필터 적용", use_container_width=True):
-                with st.spinner("필터링 중..."):
-                    filtered_videos = YouTubeAnalyzer.filter_videos(
-                        st.session_state.search_results,
-                        min_views=min_views,
-                        max_days_ago=max_days,
-                        min_duration=min_dur,
-                        max_duration=max_dur,
-                        sort_by=sort_mapping_filter[sort_by]
-                    )
-                    st.session_state.filtered_results = filtered_videos
-                
-                st.success(f"✅ 필터 적용 완료! {len(st.session_state.filtered_results)}개 영상")
-            
-            # 필터 상태 표시
-            if st.session_state.filtered_results:
-                original_count = len(st.session_state.search_results)
-                filtered_count = len(st.session_state.filtered_results)
-                
-                st.info(f"📊 **필터 결과**: {filtered_count}개 영상 (전체 {original_count}개 중)")
-                
-                # 현재 필터 조건 표시
-                active_filters = []
-                if min_views > 0:
-                    active_filters.append(f"조회수 {min_views:,}회 이상")
-                if max_days < 999999:
-                    active_filters.append(f"{max_days}일 이내")
-                if duration_range != "전체":
-                    active_filters.append(f"재생시간 {duration_range}")
-                if sort_by != "관련도":
-                    active_filters.append(f"{sort_by} 정렬")
-                
-                if active_filters:
-                    st.caption(f"🎛️ 활성 필터: {' | '.join(active_filters)}")
-            
-            # 검색 결과 표시 (필터링된 결과 사용)
+            # 현재 사용중인 영상 리스트 (정렬된 결과 우선)
             videos = st.session_state.filtered_results if st.session_state.filtered_results else st.session_state.search_results
+            
+            # 정렬 상태 표시
+            if st.session_state.filtered_results != st.session_state.search_results:
+                st.info(f"📊 **정렬 적용됨**: {len(st.session_state.filtered_results)}개 영상")
             
             st.markdown("---")
             st.subheader(f'📹 "{st.session_state.last_search_query}" 검색 결과 ({len(videos)}개)')
             
             if not videos:
-                st.warning("😅 필터 조건에 맞는 영상이 없습니다. 필터를 조정해보세요.")
+                st.warning("😅 검색 결과가 없습니다. 다른 키워드로 검색해보세요.")
             else:
-                # 페이지네이션 (한 페이지에 9개씩)
-                videos_per_page = 9
-                total_pages = (len(videos) - 1) // videos_per_page + 1
-                
-                if total_pages > 1:
-                    page_col1, page_col2, page_col3 = st.columns([1, 1, 1])
-                    
-                    with page_col2:
-                        current_page = st.selectbox(
-                            f"페이지 ({total_pages}페이지 중)",
-                            range(1, total_pages + 1),
-                            key="video_page_selector"
-                        )
-                    
-                    start_idx = (current_page - 1) * videos_per_page
-                    end_idx = start_idx + videos_per_page
-                    page_videos = videos[start_idx:end_idx]
-                else:
-                    page_videos = videos[:videos_per_page]
-                
-                # 그리드 형태로 영상 표시 (3열)
-                for i in range(0, len(page_videos), 3):
-                    cols = st.columns(3)
-                    
-                    for j, col in enumerate(cols):
-                        if i + j < len(page_videos):
-                            video = page_videos[i + j]
+                # 영상 리스트를 한 줄씩 표시 (리스트 형식)
+                for idx, video in enumerate(videos):
+                    with st.container():
+                        col1, col2, col3 = st.columns([2, 2, 1])
+                        
+                        with col1:
+                            # 썸네일 - 크기 최대로 증가
+                            try:
+                                st.image(video['thumbnail_url'], width=480)
+                            except:
+                                st.error("썸네일 로드 실패")
+                        
+                        with col2:
+                            # 영상 정보
+                            st.markdown(f"### 📺 {video['title']}")
+                            st.markdown(f"**채널**: {video['channel_name']}")
                             
-                            with col:
-                                # 컨테이너로 감싸서 안정성 향상
-                                with st.container():
-                                    # 썸네일 표시
-                                    try:
-                                        st.image(video['thumbnail_url'], use_container_width=True)
-                                    except:
-                                        st.error("썸네일 로드 실패")
-                                    
-                                    # 영상 정보 - 더 상세하게
-                                    st.markdown(f"**{video['title'][:45]}{'...' if len(video['title']) > 45 else ''}**")
-                                    st.markdown(f"📺 {video['channel_name']}")
-                                    
-                                    # 상세 정보를 컬럼으로 정리
-                                    info_col1, info_col2 = st.columns(2)
-                                    with info_col1:
-                                        st.markdown(f"👀 {video['view_count']}")
-                                        st.markdown(f"⏱️ {video['duration']}")
-                                    with info_col2:
-                                        st.markdown(f"📅 {video['published_time']}")
-                                        # 추가 통계 정보
-                                        if video['view_count_num'] >= 1000000:
-                                            st.markdown("🔥 **인기 영상**")
-                                        elif video['published_days_ago'] <= 7:
-                                            st.markdown("🆕 **최신 영상**")
-                                    
-                                    # 영상 링크
-                                    st.markdown(f"🔗 [영상 보기]({video['video_url']})")
-                                    
-                                    # 이미 선택된 영상인지 확인
-                                    if video['video_id'] in st.session_state.selected_videos:
-                                        st.success("✅ 이미 분석 목록에 추가됨")
+                            # 상세 정보를 한 줄로
+                            info_parts = []
+                            info_parts.append(f"👀 {video['view_count']}")
+                            info_parts.append(f"⏱️ {video['duration']}")
+                            info_parts.append(f"📅 {video['published_time']}")
+                            
+                            st.markdown(" | ".join(info_parts))
+                            
+                            # 품질 지표
+                            quality_tags = []
+                            if video.get('view_count_num', 0) >= 1000000:
+                                quality_tags.append("🔥 **인기 영상**")
+                            elif video.get('view_count_num', 0) >= 100000:
+                                quality_tags.append("📈 **조회수 양호**")
+                            
+                            if video.get('published_days_ago', 999) <= 7:
+                                quality_tags.append("🆕 **최신 영상**")
+                            elif video.get('published_days_ago', 999) <= 30:
+                                quality_tags.append("📅 **최근 영상**")
+                            
+                            if quality_tags:
+                                st.markdown(" ".join(quality_tags))
+                            
+                            # 영상 링크
+                            st.markdown(f"🔗 [영상 보기]({video['video_url']})")
+                        
+                        with col3:
+                            # 액션 버튼들
+                            if video['video_id'] in st.session_state.selected_videos:
+                                st.success("✅ 분석 목록에 추가됨")
+                                
+                                # 요약 상태 확인
+                                summary_key = f"summary_{video['video_id']}"
+                                if summary_key in st.session_state.video_summaries:
+                                    summary_data = st.session_state.video_summaries[summary_key]
+                                    if summary_data.get('type') == 'gpt_summary':
+                                        st.success("🤖 AI 요약 완료")
+                                    elif summary_data.get('type') == 'error':
+                                        st.error("❌ 요약 실패")
                                     else:
-                                        # 영상 추가 버튼 - 콜백 대신 세션 상태 직접 조작
-                                        button_key = f"add_video_{video['video_id']}_{i}_{j}_{current_page if 'current_page' in locals() else 1}"
-                                        if st.button(f"📝 분석 추가", key=button_key, use_container_width=True):
-                                            # 세션 상태에 영상 추가
-                                            st.session_state.selected_videos[video['video_id']] = video
-                                            st.success(f"✅ '{video['title'][:30]}...' 분석 목록에 추가됨!")
-                                            # 페이지 새로고침을 위한 rerun 호출
-                                            st.rerun()
-                                    
-                                    st.markdown("---")
+                                        st.info("📝 기본 내용 확인됨")
+                                else:
+                                    st.warning("⏳ 요약 대기중")
+                            else:
+                                button_key = f"add_video_{video['video_id']}_{idx}"
+                                if st.button(f"📝 분석 추가", key=button_key, use_container_width=True):
+                                    st.session_state.selected_videos[video['video_id']] = video
+                                    st.success(f"✅ 분석 목록에 추가됨!")
+                                    st.rerun()
+                        
+                        st.markdown("---")
         
         # 선택된 영상들 표시 및 요약
         if st.session_state.selected_videos:
@@ -4457,20 +4457,20 @@ def main():
                 pending_count = len(st.session_state.selected_videos) - analyzed_count
                 st.metric("분석 대기", f"{pending_count}개")
             
-            # 선택된 영상 목록
+            # 선택된 영상 목록 - 리스트 형식으로 표시
             video_ids = list(st.session_state.selected_videos.keys())
             
             for idx, video_id in enumerate(video_ids):
                 video = st.session_state.selected_videos[video_id]
                 
-                # 각 영상을 expandable 섹션으로 만들어 관리 용이성 향상
-                with st.expander(f"📺 {idx+1}. {video['title'][:60]}{'...' if len(video['title']) > 60 else ''}", expanded=True):
+                # 각 영상을 expandable 섹션으로
+                with st.expander(f"📺 {idx+1}. {video['title'][:80]}{'...' if len(video['title']) > 80 else ''}", expanded=False):
                     col1, col2, col3 = st.columns([1, 2, 1])
                     
                     with col1:
                         # 영상 정보
                         try:
-                            st.image(video['thumbnail_url'], width=200)
+                            st.image(video['thumbnail_url'], width=480)
                         except:
                             st.error("썸네일 로드 실패")
                         
@@ -4478,18 +4478,6 @@ def main():
                         st.markdown(f"**조회수**: {video['view_count']}")
                         st.markdown(f"**길이**: {video['duration']}")
                         st.markdown(f"**업로드**: {video['published_time']}")
-                        
-                        # 영상 품질 지표
-                        if video.get('view_count_num', 0) >= 1000000:
-                            st.success("🔥 인기 영상")
-                        elif video.get('view_count_num', 0) >= 100000:
-                            st.info("📈 조회수 양호")
-                        
-                        if video.get('published_days_ago', 999) <= 7:
-                            st.success("🆕 최신 영상")
-                        elif video.get('published_days_ago', 999) <= 30:
-                            st.info("📅 최근 영상")
-                        
                         st.markdown(f"🔗 [원본 영상]({video['video_url']})")
                     
                     with col2:
@@ -4497,7 +4485,6 @@ def main():
                         summary_key = f"summary_{video_id}"
                         
                         if summary_key in st.session_state.video_summaries:
-                            # 이미 요약된 결과 표시
                             summary_data = st.session_state.video_summaries[summary_key]
                             
                             if summary_data['type'] == 'gpt_summary':
@@ -4506,18 +4493,8 @@ def main():
                                     st.error(f"요약 실패: {summary_data['error']}")
                                 else:
                                     st.markdown(summary_data['content'])
-                                    
-                                    # 요약의 품질 평가
-                                    if len(summary_data['content']) > 500:
-                                        st.success("📊 상세한 분석 완료")
-                                    else:
-                                        st.info("📝 기본 요약 완료")
-                                        
                             elif summary_data['type'] == 'error':
                                 st.error(f"❌ 분석 실패: {summary_data.get('error', '알 수 없는 오류')}")
-                                if summary_data.get('content'):
-                                    st.text_area("부분 내용", summary_data['content'], height=150, 
-                                            key=f"error_content_{video_id}", disabled=True)
                             else:
                                 st.subheader("📝 영상 내용 (일부)")
                                 st.text_area("자막 내용", summary_data['content'], height=200, 
@@ -4526,31 +4503,20 @@ def main():
                                 if not summary_data.get('had_api_key'):
                                     st.info("💡 OpenAI API 키를 입력하시면 AI 기반 요약 분석을 받으실 수 있습니다.")
                         else:
-                            # 아직 요약되지 않음
                             st.info("🔄 요약을 시작하려면 옆의 '🚀 요약 시작' 버튼을 클릭하세요.")
-                            
-                            # 영상 예상 분석 시간 표시
-                            duration_seconds = video.get('duration_seconds', 0)
-                            if duration_seconds > 1800:  # 30분 이상
-                                st.warning("⏰ 긴 영상입니다. 분석에 시간이 걸릴 수 있습니다.")
-                            elif duration_seconds > 0:
-                                st.info(f"⏱️ 예상 분석 시간: 약 {duration_seconds//60 + 1}분")
                     
                     with col3:
-                        # 액션 버튼들을 form으로 감싸서 안정성 향상
+                        # 액션 버튼들
                         if f"summary_{video_id}" not in st.session_state.video_summaries:
-                            # 요약 시작 버튼
                             with st.form(f"analyze_form_{video_id}"):
                                 analyze_button = st.form_submit_button(f"🚀 요약 시작", use_container_width=True, type="primary")
                                 
                                 if analyze_button:
                                     with st.spinner('영상을 분석하는 중...'):
                                         try:
-                                            # 자막 추출
                                             transcript = YouTubeAnalyzer.get_video_transcript(video_id)
                                             
                                             if openai_api_key and transcript and len(transcript.strip()) > 50:
-                                                # GPT 요약
                                                 summary_result = YouTubeAnalyzer.summarize_video_with_gpt(
                                                     transcript, video['title'], openai_api_key
                                                 )
@@ -4569,10 +4535,9 @@ def main():
                                                         'had_api_key': True
                                                     }
                                             else:
-                                                # API 키가 없거나 자막 추출 실패
                                                 content = transcript[:1000] + "..." if transcript and len(transcript) > 1000 else transcript
                                                 if not content or len(content.strip()) < 10:
-                                                    content = "자막을 가져올 수 없습니다. 이 영상은 자막이 제공되지 않거나 접근할 수 없는 상태입니다."
+                                                    content = "자막을 가져올 수 없습니다."
                                                 
                                                 st.session_state.video_summaries[f"summary_{video_id}"] = {
                                                     'type': 'basic',
@@ -4591,7 +4556,6 @@ def main():
                                             }
                                             st.error(f"❌ 분석 실패: {str(e)}")
                                         
-                                        # 상태 변경 후 페이지 새로고침
                                         st.rerun()
                         else:
                             # 이미 요약됨 - 새로고침 버튼
@@ -4599,10 +4563,9 @@ def main():
                                 refresh_button = st.form_submit_button(f"🔄 다시 요약", use_container_width=True)
                                 
                                 if refresh_button:
-                                    # 기존 요약 삭제 후 다시 요약
                                     if f"summary_{video_id}" in st.session_state.video_summaries:
                                         del st.session_state.video_summaries[f"summary_{video_id}"]
-                                    st.info("🔄 요약이 초기화되었습니다. '🚀 요약 시작' 버튼을 다시 클릭하세요.")
+                                    st.info("🔄 요약이 초기화되었습니다.")
                                     st.rerun()
                         
                         st.markdown("---")
@@ -4612,7 +4575,6 @@ def main():
                             remove_button = st.form_submit_button(f"🗑️ 목록에서 제거", use_container_width=True, type="secondary")
                             
                             if remove_button:
-                                # 영상과 요약 모두 삭제
                                 if video_id in st.session_state.selected_videos:
                                     del st.session_state.selected_videos[video_id]
                                 if f"summary_{video_id}" in st.session_state.video_summaries:
@@ -4627,200 +4589,135 @@ def main():
             batch_col1, batch_col2, batch_col3 = st.columns(3)
             
             with batch_col1:
-                with st.form("analyze_all_form"):
-                    analyze_all_button = st.form_submit_button("🚀 전체 영상 일괄 분석", use_container_width=True, type="primary")
-                    
-                    if analyze_all_button:
-                        if not openai_api_key:
-                            st.error("⚠️ 일괄 분석을 위해서는 OpenAI API 키가 필요합니다.")
-                        else:
-                            progress_bar = st.progress(0)
-                            status_text = st.empty()
+                if st.button("🚀 전체 영상 일괄 분석", use_container_width=True, type="primary"):
+                    if not openai_api_key:
+                        st.error("⚠️ 일괄 분석을 위해서는 OpenAI API 키가 필요합니다.")
+                    else:
+                        progress_bar = st.progress(0)
+                        status_text = st.empty()
+                        
+                        unanalyzed_videos = [vid for vid in st.session_state.selected_videos.keys() 
+                                        if f"summary_{vid}" not in st.session_state.video_summaries]
+                        
+                        for i, video_id in enumerate(unanalyzed_videos):
+                            video = st.session_state.selected_videos[video_id]
+                            status_text.text(f"분석 중: {video['title'][:30]}... ({i+1}/{len(unanalyzed_videos)})")
                             
-                            unanalyzed_videos = [vid for vid in st.session_state.selected_videos.keys() 
-                                            if f"summary_{vid}" not in st.session_state.video_summaries]
-                            
-                            for i, video_id in enumerate(unanalyzed_videos):
-                                video = st.session_state.selected_videos[video_id]
-                                status_text.text(f"분석 중: {video['title'][:30]}... ({i+1}/{len(unanalyzed_videos)})")
-                                
-                                try:
-                                    transcript = YouTubeAnalyzer.get_video_transcript(video_id)
-                                    if transcript and len(transcript.strip()) > 50:
-                                        summary_result = YouTubeAnalyzer.summarize_video_with_gpt(
-                                            transcript, video['title'], openai_api_key
-                                        )
-                                        
-                                        if summary_result.get('error'):
-                                            st.session_state.video_summaries[f"summary_{video_id}"] = {
-                                                'type': 'error',
-                                                'content': transcript[:1000] + "..." if len(transcript) > 1000 else transcript,
-                                                'error': summary_result['error'],
-                                                'had_api_key': True
-                                            }
-                                        else:
-                                            st.session_state.video_summaries[f"summary_{video_id}"] = {
-                                                'type': 'gpt_summary',
-                                                'content': summary_result['summary'],
-                                                'had_api_key': True
-                                            }
-                                    else:
+                            try:
+                                transcript = YouTubeAnalyzer.get_video_transcript(video_id)
+                                if transcript and len(transcript.strip()) > 50:
+                                    summary_result = YouTubeAnalyzer.summarize_video_with_gpt(
+                                        transcript, video['title'], openai_api_key
+                                    )
+                                    
+                                    if summary_result.get('error'):
                                         st.session_state.video_summaries[f"summary_{video_id}"] = {
-                                            'type': 'basic',
-                                            'content': "자막을 가져올 수 없습니다.",
+                                            'type': 'error',
+                                            'content': transcript[:1000] + "..." if len(transcript) > 1000 else transcript,
+                                            'error': summary_result['error'],
                                             'had_api_key': True
                                         }
-                                except Exception as e:
+                                    else:
+                                        st.session_state.video_summaries[f"summary_{video_id}"] = {
+                                            'type': 'gpt_summary',
+                                            'content': summary_result['summary'],
+                                            'had_api_key': True
+                                        }
+                                else:
                                     st.session_state.video_summaries[f"summary_{video_id}"] = {
-                                        'type': 'error',
-                                        'content': '',
-                                        'error': f"분석 중 오류: {str(e)}",
+                                        'type': 'basic',
+                                        'content': "자막을 가져올 수 없습니다.",
                                         'had_api_key': True
                                     }
-                                
-                                progress_bar.progress((i + 1) / len(unanalyzed_videos))
+                            except Exception as e:
+                                st.session_state.video_summaries[f"summary_{video_id}"] = {
+                                    'type': 'error',
+                                    'content': '',
+                                    'error': f"분석 중 오류: {str(e)}",
+                                    'had_api_key': True
+                                }
                             
-                            progress_bar.empty()
-                            status_text.empty()
-                            st.success(f"✅ {len(unanalyzed_videos)}개 영상 일괄 분석 완료!")
-                            st.rerun()
+                            progress_bar.progress((i + 1) / len(unanalyzed_videos))
+                        
+                        progress_bar.empty()
+                        status_text.empty()
+                        st.success(f"✅ {len(unanalyzed_videos)}개 영상 일괄 분석 완료!")
+                        st.rerun()
             
             with batch_col2:
-                # 내보내기 준비 버튼 (form 안에)
-                with st.form("export_form"):
-                    export_button = st.form_submit_button("📤 분석 결과 준비", use_container_width=True)
-                    
-                    if export_button:
-                        # 세션 상태에 내보내기 데이터 저장
-                        from datetime import datetime
-                        export_text = f"# 유튜브 영상 분석 결과\n\n검색어: {st.session_state.last_search_query}\n분석일: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                        
-                        for idx, (video_id, video) in enumerate(st.session_state.selected_videos.items()):
-                            export_text += f"## {idx+1}. {video['title']}\n\n"
-                            export_text += f"- **채널**: {video['channel_name']}\n"
-                            export_text += f"- **조회수**: {video['view_count']}\n"
-                            export_text += f"- **길이**: {video['duration']}\n"
-                            export_text += f"- **업로드**: {video['published_time']}\n"
-                            export_text += f"- **링크**: {video['video_url']}\n\n"
-                            
-                            summary_key = f"summary_{video_id}"
-                            if summary_key in st.session_state.video_summaries:
-                                summary_data = st.session_state.video_summaries[summary_key]
-                                export_text += f"**분석 결과:**\n{summary_data.get('content', '분석 실패')}\n\n"
-                            else:
-                                export_text += "**분석 결과:** 분석되지 않음\n\n"
-                            
-                            export_text += "---\n\n"
-                        
-                        # 세션 상태에 저장
-                        st.session_state.export_ready = True
-                        st.session_state.export_data = export_text
-                        st.success("✅ 내보내기 파일이 준비되었습니다!")
-                
-                # 다운로드 버튼 (form 밖에)
-                if st.session_state.get('export_ready', False) and st.session_state.get('export_data'):
+                if st.button("📤 분석 결과 내보내기", use_container_width=True):
                     from datetime import datetime
+                    export_text = f"# 유튜브 영상 분석 결과\n\n검색어: {st.session_state.last_search_query}\n분석일: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                    
+                    for idx, (video_id, video) in enumerate(st.session_state.selected_videos.items()):
+                        export_text += f"## {idx+1}. {video['title']}\n\n"
+                        export_text += f"- **채널**: {video['channel_name']}\n"
+                        export_text += f"- **조회수**: {video['view_count']}\n"
+                        export_text += f"- **길이**: {video['duration']}\n"
+                        export_text += f"- **업로드**: {video['published_time']}\n"
+                        export_text += f"- **링크**: {video['video_url']}\n\n"
+                        
+                        summary_key = f"summary_{video_id}"
+                        if summary_key in st.session_state.video_summaries:
+                            summary_data = st.session_state.video_summaries[summary_key]
+                            export_text += f"**분석 결과:**\n{summary_data.get('content', '분석 실패')}\n\n"
+                        else:
+                            export_text += "**분석 결과:** 분석되지 않음\n\n"
+                        
+                        export_text += "---\n\n"
+                    
                     st.download_button(
                         label="📥 마크다운 파일 다운로드",
-                        data=st.session_state.export_data,
+                        data=export_text,
                         file_name=f"youtube_analysis_{st.session_state.last_search_query}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
                         mime="text/markdown",
                         use_container_width=True
                     )
             
             with batch_col3:
-                with st.form("clear_all_form"):
-                    clear_all_button = st.form_submit_button("🗑️ 전체 목록 초기화", type="secondary", use_container_width=True)
-                    
-                    if clear_all_button:
-                        st.session_state.selected_videos = {}
-                        st.session_state.video_summaries = {}
-                        st.session_state.search_results = []
-                        st.session_state.filtered_results = []
-                        st.session_state.last_search_query = ""
-                        st.success("✅ 전체 목록이 초기화되었습니다!")
-                        st.rerun()
+                if st.button("🗑️ 전체 목록 초기화", type="secondary", use_container_width=True):
+                    st.session_state.selected_videos = {}
+                    st.session_state.video_summaries = {}
+                    st.session_state.search_results = []
+                    st.session_state.filtered_results = []
+                    st.session_state.last_search_query = ""
+                    st.success("✅ 전체 목록이 초기화되었습니다!")
+                    st.rerun()
 
         else:
             st.info("📝 위에서 영상을 검색하고 '📝 분석 추가' 버튼을 눌러 분석할 영상을 선택하세요.")
         
-        # 통계 정보 표시
-        if st.session_state.search_results or st.session_state.selected_videos:
-            st.markdown("---")
-            st.subheader("📊 세션 통계")
-            
-            stat_col1, stat_col2, stat_col3, stat_col4 = st.columns(4)
-            
-            with stat_col1:
-                st.metric("검색된 영상", len(st.session_state.search_results))
-            
-            with stat_col2:
-                st.metric("필터링된 영상", len(st.session_state.filtered_results))
-            
-            with stat_col3:
-                st.metric("선택된 영상", len(st.session_state.selected_videos))
-            
-            with stat_col4:
-                analyzed_count = len([k for k in st.session_state.video_summaries.keys() if k.startswith('summary_')])
-                st.metric("분석 완료", analyzed_count)
-        
-        # 현재 세션 상태 디버깅 정보 (개발용)
-        if st.checkbox("🔧 디버깅 정보 표시", help="개발자용 세션 상태 정보"):
-            st.write("**현재 세션 상태:**")
-            st.write(f"- 검색 결과 수: {len(st.session_state.search_results)}")
-            st.write(f"- 필터링된 결과 수: {len(st.session_state.filtered_results)}")
-            st.write(f"- 선택된 영상 수: {len(st.session_state.selected_videos)}")
-            st.write(f"- 요약된 영상 수: {len(st.session_state.video_summaries)}")
-            st.write(f"- 마지막 검색어: {st.session_state.last_search_query}")
-            
-            if st.button("🔄 세션 상태 강제 초기화 (디버깅용)"):
-                for key in ['selected_videos', 'video_summaries', 'search_results', 'filtered_results', 'last_search_query']:
-                    if key in st.session_state:
-                        del st.session_state[key]
-                st.success("세션 상태가 강제로 초기화되었습니다.")
-                st.rerun()
-        
         # 사용법 안내
-        with st.expander('💡 유튜브 분석 사용법 (향상된 기능)'):
+        with st.expander('💡 유튜브 분석 사용법'):
             st.markdown("""
-            **🆕 새로운 기능**
-            - **대용량 검색**: 최대 100개 영상 검색 가능
-            - **고급 필터링**: 조회수, 업로드일, 재생시간으로 필터링
-            - **다양한 정렬**: 관련도, 조회수, 최신순, 재생시간순 정렬
-            - **일괄 분석**: 선택된 모든 영상을 한 번에 분석
-            - **결과 내보내기**: 분석 결과를 마크다운 파일로 다운로드
-            - **페이지네이션**: 많은 검색 결과를 페이지로 나누어 표시
-            - **통계 대시보드**: 세션별 분석 현황 표시
-            
             **🔍 효과적인 검색 방법**
             - **종목 중심**: "AAPL stock analysis", "Tesla earnings review"
             - **시점 중심**: "2024 Q4 earnings", "latest market update"
             - **분석 유형**: "technical analysis", "fundamental analysis"
             - **전망 중심**: "price prediction", "investment outlook"
             
-            **🎛️ 필터링 활용법**
-            - **인기 영상 찾기**: 조회수 100,000회 이상 필터
-            - **최신 정보**: 7일 이내 업로드 필터
-            - **심층 분석**: 20분 이상 긴 영상 필터
-            - **빠른 정보**: 4분 이하 짧은 영상 필터
+            **🎛️ 정렬 활용법**
+            - **관련도**: 검색어와 가장 관련성이 높은 순서 (높은 순만 가능)
+            - **조회수**: 
+            - 높은 순: 인기 영상 우선 (많이 본 순)
+            - 낮은 순: 숨은 보석 영상 발굴 (적게 본 순)
+            - **최신순**: 
+            - 높은 순: 최근 업로드된 영상 우선
+            - 낮은 순: 과거 영상부터 표시
+            - **재생시간**: 
+            - 높은 순: 긴 영상부터 (심층 분석용)
+            - 낮은 순: 짧은 영상부터 (빠른 정보용)
             
             **🚀 분석 효율성 팁**
-            1. **검색 → 필터링 → 선택 → 일괄 분석** 순서로 진행
+            1. **검색 → 정렬 → 선택 → 일괄 분석** 순서로 진행
             2. 관심 있는 영상만 선별해서 API 비용 절약
             3. 분석 결과는 마크다운으로 내보내서 보관
             4. 여러 키워드로 검색해서 다양한 관점 수집
             
             **⚠️ 주의사항**
-            - 유튜브 검색 제한으로 모든 영상을 가져오지 못할 수 있음
             - 일괄 분석은 API 사용량이 많으니 신중하게 사용
             - 영상 자막이 없는 경우 분석이 제한적일 수 있음
             - 긴 영상일수록 분석 시간이 오래 걸림
-            
-            **💡 고급 활용법**
-            - **경쟁 분석**: 같은 종목에 대한 여러 채널 의견 비교
-            - **시점별 분석**: 실적 발표 전후 영상들 비교
-            - **채널별 특성**: 특정 채널의 분석 패턴 파악
-            - **키워드 트렌드**: 인기 검색어 변화 추적
             """)
 
     with tab9:
