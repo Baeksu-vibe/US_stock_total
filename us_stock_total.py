@@ -75,6 +75,139 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+class GPTModelConfig:
+    """GPT 모델 설정 관리 클래스"""
+    
+    # 사용 가능한 모델 목록
+    MODELS = {
+        "GPT-5": {
+            "id": "gpt-5",
+            "description": "최고 성능의 최신 모델 (코딩 및 복잡한 작업에 최적)",
+            "color": "🔥",
+            "category": "premium"
+        },
+        "GPT-5 mini": {
+            "id": "gpt-5-mini", 
+            "description": "빠르고 비용 효율적인 GPT-5 버전",
+            "color": "⚡",
+            "category": "balanced"
+        },
+        "GPT-5 nano": {
+            "id": "gpt-5-nano",
+            "description": "가장 빠르고 저렴한 GPT-5 버전", 
+            "color": "💫",
+            "category": "efficient"
+        },
+        "GPT-4.1": {
+            "id": "gpt-4.1",
+            "description": "스마트한 비추론 모델",
+            "color": "🧠",
+            "category": "smart"
+        },
+        "GPT-4.1 mini": {
+            "id": "gpt-4.1-mini",
+            "description": "GPT-4.1의 작고 빠른 버전",
+            "color": "⚡",
+            "category": "efficient"
+        },
+        "GPT-4o": {
+            "id": "gpt-4o",
+            "description": "GPT-4o 모델 (멀티모달 지원)",
+            "color": "🎯",
+            "category": "multimodal"
+        },
+        "GPT-4o mini": {
+            "id": "gpt-4o-mini",
+            "description": "빠르고 저렴한 GPT-4o 버전",
+            "color": "💨",
+            "category": "efficient"
+        },
+        "GPT-4o Realtime": {
+            "id": "gpt-4o-realtime",
+            "description": "실시간 텍스트 및 오디오 입출력 모델",
+            "color": "🔴",
+            "category": "realtime"
+        },
+        "o3": {
+            "id": "o3",
+            "description": "복잡한 작업을 위한 추론 모델 (GPT-5의 후속작)",
+            "color": "🏆",
+            "category": "reasoning"
+        },
+        "o3-pro": {
+            "id": "o3-pro",
+            "description": "더 많은 연산으로 더 나은 응답을 제공하는 o3 버전",
+            "color": "💎",
+            "category": "reasoning"
+        },
+        "o3-deep-research": {
+            "id": "o3-deep-research",
+            "description": "가장 강력한 심층 연구 모델",
+            "color": "🔬",
+            "category": "research"
+        },
+        "o4-mini-deep-research": {
+            "id": "o4-mini-deep-research",
+            "description": "더 빠르고 저렴한 심층 연구 모델",
+            "color": "🔍",
+            "category": "research"
+        }
+    }
+    
+    @classmethod
+    def get_model_selector(cls, key_prefix="", help_text=""):
+        """모델 선택기 생성"""
+        model_names = list(cls.MODELS.keys())
+        
+        # 기본 모델 설정 (GPT-4.1 mini - 빠르고 안정적)
+        default_idx = model_names.index("GPT-4.1 mini") if "GPT-4.1 mini" in model_names else 0
+        
+        selected_model_name = st.selectbox(
+            "🤖 GPT 모델 선택",
+            model_names,
+            index=default_idx,
+            help=help_text or "분석에 사용할 GPT 모델을 선택하세요. 모델별로 성능과 비용이 다릅니다.",
+            key=f"model_selector_{key_prefix}"
+        )
+        
+        selected_model = cls.MODELS[selected_model_name]
+        
+        # 선택된 모델 정보 표시
+        model_info = f"{selected_model['color']} **{selected_model_name}**: {selected_model['description']}"
+        
+        if selected_model['category'] == 'premium':
+            st.info(f"💰 {model_info} (높은 비용, 최고 성능)")
+        elif selected_model['category'] == 'reasoning':
+            st.success(f"🧠 {model_info} (추론 특화)")
+        elif selected_model['category'] == 'research':
+            st.warning(f"🔬 {model_info} (연구 특화, 높은 비용)")
+        elif selected_model['category'] == 'efficient':
+            st.success(f"⚡ {model_info} (빠르고 경제적)")
+        else:
+            st.info(f"📊 {model_info}")
+        
+        return selected_model['id']
+    
+    @classmethod
+    def get_api_key_input(cls, key_prefix="", help_text=""):
+        """API 키 입력 생성"""
+        api_key = st.text_input(
+            "🔑 OpenAI API Key",
+            type="password",
+            help=help_text or "OpenAI API 키를 입력하세요. https://platform.openai.com/api-keys 에서 발급받을 수 있습니다.",
+            key=f"api_key_{key_prefix}"
+        )
+        
+        if api_key:
+            if api_key.startswith(('sk-', 'sk-proj-')) and len(api_key) > 20:
+                st.success("✅ 유효한 API 키 형식입니다.")
+                return api_key
+            else:
+                st.error("❌ 올바른 API 키 형식이 아닙니다. 'sk-' 또는 'sk-proj-'로 시작해야 합니다.")
+                return None
+        
+        return None
+
 class SectorTreemapAnalyzer:
     """섹터별 트리맵 분석 클래스"""
     
@@ -882,8 +1015,8 @@ class SentimentAnalyzer:
             return []
     
     @staticmethod
-    def analyze_with_gpt(news_data: List[Dict], symbol: str, openai_api_key: str) -> Dict:
-        """GPT를 이용한 뉴스 분석"""
+    def analyze_with_gpt(news_data: List[Dict], symbol: str, openai_api_key: str, model_id: str = "gpt-4.1-mini") -> Dict:
+        """GPT를 이용한 뉴스 분석 - 모델 선택 가능"""
         try:
             if not openai_api_key:
                 return {"error": "OpenAI API 키가 필요합니다."}
@@ -915,7 +1048,7 @@ class SentimentAnalyzer:
 """
 
             response = client.chat.completions.create(
-                model="gpt-4-turbo-preview",
+                model=model_id,  # 선택된 모델 사용
                 messages=[
                     {"role": "system", "content": "당신은 전문 투자 분석가입니다. 뉴스를 분석하여 객관적이고 통찰력 있는 투자 분석을 제공합니다."},
                     {"role": "user", "content": prompt}
@@ -947,7 +1080,8 @@ class SentimentAnalyzer:
                 "analysis": analysis,
                 "sentiment_score": sentiment_score,
                 "sentiment_label": sentiment_label,
-                "news_count": len(news_data)
+                "news_count": len(news_data),
+                "model_used": model_id
             }
             
         except Exception as e:
@@ -1005,8 +1139,8 @@ class SentimentAnalyzer:
             return {}
     
     @staticmethod
-    def get_enhanced_news_sentiment(symbol: str, openai_api_key: str = None) -> Dict:
-        """GPT 기반 향상된 뉴스 감성 분석"""
+    def get_enhanced_news_sentiment(symbol: str, openai_api_key: str = None, model_id: str = "gpt-4.1-mini") -> Dict:
+        """GPT 기반 향상된 뉴스 감성 분석 - 모델 선택 가능"""
         try:
             # 웹 검색으로 실제 뉴스 수집
             search_query = f"{symbol} stock news latest"
@@ -1062,7 +1196,7 @@ class SentimentAnalyzer:
             
             # GPT 분석 (API 키가 있는 경우)
             if openai_api_key:
-                gpt_result = SentimentAnalyzer.analyze_with_gpt(news_results, symbol, openai_api_key)
+                gpt_result = SentimentAnalyzer.analyze_with_gpt(news_results, symbol, openai_api_key, model_id)
                 result['gpt_analysis'] = gpt_result
             
             return result
@@ -1106,8 +1240,8 @@ class FinancialAnalyzer:
             return {}
     
     @staticmethod
-    def analyze_financial_metrics_with_gpt(metrics: Dict, financial_history: Dict, symbol: str, openai_api_key: str) -> Dict:
-        """GPT를 이용한 재무 지표 분석"""
+    def analyze_financial_metrics_with_gpt(metrics: Dict, financial_history: Dict, symbol: str, openai_api_key: str, model_id: str = "gpt-4.1-mini") -> Dict:
+        """GPT를 이용한 재무 지표 분석 - 모델 선택 가능"""
         try:
             if not openai_api_key:
                 return {"error": "OpenAI API 키가 필요합니다."}
@@ -1115,6 +1249,7 @@ class FinancialAnalyzer:
             from openai import OpenAI
             client = OpenAI(api_key=openai_api_key)
             
+            # [기존 프롬프트 코드는 동일하게 유지]
             # 재무 데이터를 텍스트로 변환
             financial_text = f"""
 {symbol} 기업의 재무 지표 분석:
@@ -1187,7 +1322,7 @@ class FinancialAnalyzer:
 """
 
             response = client.chat.completions.create(
-                model="gpt-4.1-mini",
+                model=model_id,  # 선택된 모델 사용
                 messages=[
                     {"role": "system", "content": "당신은 전문 재무 분석가입니다. 기업의 재무 지표를 종합적으로 분석하여 투자자에게 실용적인 인사이트를 제공합니다."},
                     {"role": "user", "content": prompt}
@@ -1207,7 +1342,8 @@ class FinancialAnalyzer:
                 "analysis": analysis,
                 "score": score,
                 "max_score": 5.0,
-                "success": True
+                "success": True,
+                "model_used": model_id
             }
             
         except Exception as e:
@@ -1331,8 +1467,8 @@ class EconomicIndicatorAnalyzer:
             return {}
     
     @staticmethod
-    def analyze_economic_indicators_with_gpt(indicators: Dict, openai_api_key: str) -> Dict:
-        """GPT를 이용한 종합 경제지표 분석"""
+    def analyze_economic_indicators_with_gpt(indicators: Dict, openai_api_key: str, model_id: str = "gpt-4.1-mini") -> Dict:
+        """GPT를 이용한 종합 경제지표 분석 - 모델 선택 가능"""
         try:
             if not openai_api_key:
                 return {"error": "OpenAI API 키가 필요합니다."}
@@ -1340,7 +1476,7 @@ class EconomicIndicatorAnalyzer:
             from openai import OpenAI
             client = OpenAI(api_key=openai_api_key)
             
-            # 경제지표 데이터를 텍스트로 변환
+            # [기존 경제지표 텍스트 변환 코드는 동일하게 유지]
             economic_text = "📊 현재 주요 경제지표 현황:\n\n"
             
             # 주식 지수
@@ -1394,63 +1530,63 @@ class EconomicIndicatorAnalyzer:
                 economic_text += f"• 비트코인: ${btc['current_price']:,.0f} ({btc['change_pct']:+.2f}%)\n"
 
             prompt = f"""
-    다음은 현재 주요 경제지표들의 실시간 데이터입니다. 전문 경제 분석가 관점에서 종합 분석해주세요:
+다음은 현재 주요 경제지표들의 실시간 데이터입니다. 전문 경제 분석가 관점에서 종합 분석해주세요:
 
-    {economic_text}
+{economic_text}
 
-    다음 형식으로 분석해주세요:
+다음 형식으로 분석해주세요:
 
-    ## 🌍 대외 경제환경 종합 분석
+## 🌍 대외 경제환경 종합 분석
 
-    ### 1. **현재 경제 상황 진단** (5점 만점으로 점수 부여)
-    - 종합 점수: X/5점
-    - 한 줄 요약
+### 1. **현재 경제 상황 진단** (5점 만점으로 점수 부여)
+- 종합 점수: X/5점
+- 한 줄 요약
 
-    ### 2. **주식시장 분석**
-    - 주요 지수 동향 및 의미
-    - 시장 모멘텀 평가
-    - 섹터별 영향 전망
+### 2. **주식시장 분석**
+- 주요 지수 동향 및 의미
+- 시장 모멘텀 평가
+- 섹터별 영향 전망
 
-    ### 3. **금리 환경 분석**
-    - 수익률 곡선 상태 및 의미
-    - 연준 정책 방향성 추론
-    - 장단기 금리 스프레드 분석
+### 3. **금리 환경 분석**
+- 수익률 곡선 상태 및 의미
+- 연준 정책 방향성 추론
+- 장단기 금리 스프레드 분석
 
-    ### 4. **인플레이션 및 원자재**
-    - 금, 원유 가격 동향 분석
-    - 인플레이션 압력 진단
-    - 원자재 순환 사이클 위치
+### 4. **인플레이션 및 원자재**
+- 금, 원유 가격 동향 분석
+- 인플레이션 압력 진단
+- 원자재 순환 사이클 위치
 
-    ### 5. **달러 및 외환 환경**
-    - 달러 강세/약세 배경
-    - 글로벌 유동성 상황
-    - 신흥국 영향 평가
+### 5. **달러 및 외환 환경**
+- 달러 강세/약세 배경
+- 글로벌 유동성 상황
+- 신흥국 영향 평가
 
-    ### 6. **리스크 지표 분석**
-    - VIX를 통한 시장 불안감 측정
-    - 안전자산 선호도 변화
-    - 시스템 리스크 수준 평가
+### 6. **리스크 지표 분석**
+- VIX를 통한 시장 불안감 측정
+- 안전자산 선호도 변화
+- 시스템 리스크 수준 평가
 
-    ### 7. **투자자를 위한 시사점**
-    - 현재 상황에서의 자산배분 방향
-    - 주의해야 할 리스크 요인
-    - 기회 요인 및 투자 테마
+### 7. **투자자를 위한 시사점**
+- 현재 상황에서의 자산배분 방향
+- 주의해야 할 리스크 요인
+- 기회 요인 및 투자 테마
 
-    ### 8. **향후 전망** (1-3개월)
-    - 예상되는 시장 시나리오
-    - 주요 변곡점 및 모니터링 지표
-    - 정책 변화 가능성
+### 8. **향후 전망** (1-3개월)
+- 예상되는 시장 시나리오
+- 주요 변곡점 및 모니터링 지표
+- 정책 변화 가능성
 
-    ### 9. **결론 및 투자 가이드**
-    - 현재 경제환경 한 줄 요약
-    - Risk-On / Risk-Off 중 어느 상황인지
-    - 추천 투자 전략 (공격적/중립적/방어적)
+### 9. **결론 및 투자 가이드**
+- 현재 경제환경 한 줄 요약
+- Risk-On / Risk-Off 중 어느 상황인지
+- 추천 투자 전략 (공격적/중립적/방어적)
 
-    각 섹션을 구체적이고 실용적으로 분석해주시고, 투자자가 실제로 활용할 수 있는 인사이트를 제공해주세요.
-    """
+각 섹션을 구체적이고 실용적으로 분석해주시고, 투자자가 실제로 활용할 수 있는 인사이트를 제공해주세요.
+"""
 
             response = client.chat.completions.create(
-                model="gpt-4.1-mini",
+                model=model_id,  # 선택된 모델 사용
                 messages=[
                     {"role": "system", "content": "당신은 전문 거시경제 분석가입니다. 다양한 경제지표를 종합하여 현재 경제환경을 정확히 진단하고, 투자자에게 실용적인 가이드를 제공합니다."},
                     {"role": "user", "content": prompt}
@@ -1483,7 +1619,8 @@ class EconomicIndicatorAnalyzer:
                 "max_score": 5.0,
                 "environment": environment,
                 "environment_color": environment_color,
-                "success": True
+                "success": True,
+                "model_used": model_id
             }
             
         except Exception as e:
@@ -2045,8 +2182,8 @@ pip install youtube-transcript-api
 """
     
     @staticmethod
-    def summarize_video_with_gpt(transcript: str, video_title: str, openai_api_key: str) -> Dict:
-        """GPT를 이용한 영상 요약"""
+    def summarize_video_with_gpt(transcript: str, video_title: str, openai_api_key: str, model_id: str = "gpt-4.1-mini") -> Dict:
+        """GPT를 이용한 영상 요약 - 모델 선택 가능"""
         try:
             if not openai_api_key:
                 return {"error": "OpenAI API 키가 필요합니다."}
@@ -2072,7 +2209,7 @@ pip install youtube-transcript-api
 """
 
             response = client.chat.completions.create(
-                model="gpt-4.1-mini",
+                model=model_id,  # 선택된 모델 사용
                 messages=[
                     {"role": "system", "content": "당신은 전문 투자 분석가입니다. 유튜브 영상 내용을 투자자 관점에서 요약하고 분석합니다."},
                     {"role": "user", "content": prompt}
@@ -2085,7 +2222,8 @@ pip install youtube-transcript-api
             
             return {
                 "summary": summary,
-                "success": True
+                "success": True,
+                "model_used": model_id
             }
             
         except Exception as e:
@@ -2662,8 +2800,8 @@ class GoogleTrendsAnalyzer:
             return go.Figure()
     
     @staticmethod
-    def analyze_trends_with_gpt(trends_data: Dict, openai_api_key: str) -> Dict:
-        """GPT를 이용한 트렌드 분석"""
+    def analyze_trends_with_gpt(trends_data: Dict, openai_api_key: str, model_id: str = "gpt-4.1-mini") -> Dict:
+        """GPT를 이용한 트렌드 분석 - 모델 선택 가능"""
         try:
             if not openai_api_key or not trends_data:
                 return {"error": "API 키 또는 트렌드 데이터가 없습니다."}
@@ -2759,7 +2897,7 @@ class GoogleTrendsAnalyzer:
 """
 
             response = client.chat.completions.create(
-                model="gpt-4.1-mini",
+                model=model_id,  # 선택된 모델 사용
                 messages=[
                     {"role": "system", "content": "당신은 전문 투자 분석가입니다. 구글 트렌드 데이터를 활용하여 투자자에게 유용한 시장 심리 분석을 제공합니다."},
                     {"role": "user", "content": prompt}
@@ -2779,7 +2917,8 @@ class GoogleTrendsAnalyzer:
                 "analysis": analysis,
                 "score": score,
                 "max_score": 5.0,
-                "success": True
+                "success": True,
+                "model_used": model_id
             }
             
         except Exception as e:
@@ -2857,6 +2996,7 @@ def main():
     
     # 사이드바 - 입력 설정
     st.sidebar.header('📊 분석 설정')
+    
     
     # 종목 입력
     symbols_input = st.sidebar.text_input(
@@ -3379,176 +3519,183 @@ def main():
         
         if not symbols:
             st.warning('종목 코드를 입력해주세요.')
-            return
-        
-        # OpenAI API 키 입력
-        st.subheader('🔧 GPT 분석 설정 (선택사항)')
-        openai_api_key = st.text_input(
-            "OpenAI API 키 (GPT 기반 뉴스 분석을 위해 필요)",
-            type="password",
-            help="GPT를 이용한 실시간 뉴스 분석을 원하시면 OpenAI API 키를 입력하세요. 입력하지 않으면 기본 감성 분석만 진행됩니다."
-        )
-        
-        # API 키 검증
-        if openai_api_key:
-            if openai_api_key.startswith('sk-') and len(openai_api_key) > 20:
-                st.success("✅ API 키 형식이 올바릅니다.")
-            else:
-                st.error("❌ API 키 형식이 잘못되었습니다. 'sk-'로 시작하는 올바른 키를 입력해주세요.")
         else:
-            st.info("ℹ️ API 키를 입력하지 않으면 기본 감성 분석만 제공됩니다.")
-        
-        for symbol in symbols:
-            st.subheader(f'{symbol} 뉴스 감성 분석')
+            # GPT 설정 섹션
+            st.subheader('🔧 GPT 분석 설정 (선택사항)')
+            col1, col2 = st.columns(2)
             
-            with st.spinner(f'{symbol} 뉴스 데이터를 분석하는 중...'):
-                # GPT 기반 향상된 분석
-                enhanced_sentiment_data = SentimentAnalyzer.get_enhanced_news_sentiment(symbol, openai_api_key)
+            with col1:
+                # 모델 선택
+                selected_model = GPTModelConfig.get_model_selector(
+                    key_prefix="news",
+                    help_text="뉴스 분석에 사용할 GPT 모델을 선택하세요."
+                )
+            
+            with col2:
+                # API 키 입력
+                openai_api_key = GPTModelConfig.get_api_key_input(
+                    key_prefix="news",
+                    help_text="뉴스 분석을 위한 OpenAI API 키"
+                )
+            
+            # 각 종목별 뉴스 분석
+            for symbol in symbols:
+                st.subheader(f'{symbol} 뉴스 감성 분석')
                 
-                # 디버깅 정보 표시
-                if openai_api_key:
-                    st.info(f"🔑 API 키 설정됨 - GPT 분석 진행 중...")
+                with st.spinner(f'{symbol} 뉴스 데이터를 분석하는 중...'):
+                    # GPT 기반 향상된 분석 (모델 ID 포함)
+                    enhanced_sentiment_data = SentimentAnalyzer.get_enhanced_news_sentiment(
+                        symbol, openai_api_key, selected_model
+                    )
                     
-                    # 뉴스 수집 상태 확인
-                    news_count = len(enhanced_sentiment_data.get('news_articles', []))
-                    st.info(f"📰 수집된 뉴스: {news_count}개")
-                else:
-                    st.warning("🔑 API 키가 설정되지 않음 - 기본 분석만 진행")
-                
-                if enhanced_sentiment_data.get('gpt_analysis'):
-                    if enhanced_sentiment_data['gpt_analysis'].get('error'):
-                        # GPT 분석 오류 표시
-                        st.error(f"🤖 GPT 분석 오류: {enhanced_sentiment_data['gpt_analysis']['error']}")
-                        st.info("💡 기본 감성 분석으로 대체합니다.")
+                    # 디버깅 정보 표시
+                    if openai_api_key:
+                        st.info(f"🔑 API 키 설정됨 - GPT 분석 진행 중...")
+                        
+                        # 뉴스 수집 상태 확인
+                        news_count = len(enhanced_sentiment_data.get('news_articles', []))
+                        st.info(f"📰 수집된 뉴스: {news_count}개")
                     else:
-                        # GPT 분석 성공
-                        st.success("🤖 GPT 분석 완료!")
-                        gpt_analysis = enhanced_sentiment_data['gpt_analysis']
-                        
-                        # 감성 상태 표시
-                        sentiment_label = gpt_analysis.get('sentiment_label', '중립적')
-                        if '긍정' in sentiment_label:
-                            st.success(f"📈 전체 감성: {sentiment_label}")
-                        elif '부정' in sentiment_label:
-                            st.error(f"📉 전체 감성: {sentiment_label}")
+                        st.warning("🔑 API 키가 설정되지 않음 - 기본 분석만 진행")
+                    
+                    # GPT 분석 결과 처리
+                    if enhanced_sentiment_data.get('gpt_analysis'):
+                        if enhanced_sentiment_data['gpt_analysis'].get('error'):
+                            # GPT 분석 오류 표시
+                            st.error(f"🤖 GPT 분석 오류: {enhanced_sentiment_data['gpt_analysis']['error']}")
+                            st.info("💡 기본 감성 분석으로 대체합니다.")
                         else:
-                            st.info(f"📊 전체 감성: {sentiment_label}")
-                        
-                        # GPT 분석 내용 표시
-                        st.markdown("### 📋 전문가 분석 요약")
-                        st.markdown(gpt_analysis['analysis'])
-                        
-                        st.markdown("---")
-                
-                elif openai_api_key:
-                    # API 키는 있지만 GPT 분석이 없는 경우
-                    st.warning("🤖 GPT 분석을 실행할 수 없습니다. API 키를 확인해주세요.")
-                
-                # 실제 뉴스 기사들 표시
-                if enhanced_sentiment_data.get('news_articles'):
-                    st.subheader('📰 최신 뉴스 (실시간 수집)')
-                    
-                    # 뉴스 개수와 기본 감성 요약
-                    if enhanced_sentiment_data.get('basic_sentiment'):
-                        summary = enhanced_sentiment_data['basic_sentiment']['summary']
-                        col1, col2, col3, col4 = st.columns(4)
-                        
-                        with col1:
-                            st.metric('전체 기사', summary.get('total', 0))
-                        
-                        with col2:
-                            st.metric('긍정', summary.get('positive', 0), delta_color='normal')
-                        
-                        with col3:
-                            st.metric('중립', summary.get('neutral', 0), delta_color='off')
-                        
-                        with col4:
-                            st.metric('부정', summary.get('negative', 0), delta_color='inverse')
-                    
-                    # 감성 분석 차트 (기본 분석 기준)
-                    if enhanced_sentiment_data.get('basic_sentiment'):
-                        fig = create_sentiment_chart(enhanced_sentiment_data['basic_sentiment'])
-                        st.plotly_chart(fig, use_container_width=True, key=f"sentiment_chart_{symbol}")
-                    
-                    # 개별 뉴스 기사 표시
-                    st.subheader('📄 개별 뉴스 기사')
-                    
-                    if enhanced_sentiment_data.get('basic_sentiment'):
-                        sentiments = enhanced_sentiment_data['basic_sentiment']['sentiments']
-                        
-                        for i, item in enumerate(sentiments[:10]):  # 최대 10개 표시
-                            sentiment_color = 'green' if item['sentiment_category'] == 'Positive' else 'red' if item['sentiment_category'] == 'Negative' else 'gray'
+                            # GPT 분석 성공
+                            st.success("🤖 GPT 분석 완료!")
+                            gpt_analysis = enhanced_sentiment_data['gpt_analysis']
                             
-                            with st.expander(f"📰 {item['title'][:80]}{'...' if len(item['title']) > 80 else ''}"):
-                                col1, col2 = st.columns([3, 1])
-                                
-                                with col1:
-                                    st.markdown(f"**제목**: {item['title']}")
-                                    st.markdown(f"**출처**: {item.get('source', 'Unknown')} | **시간**: {item.get('time', 'Unknown')}")
-                                    if item.get('link') and item['link'] != '#':
-                                        st.markdown(f"**링크**: [기사 읽기]({item['link']})")
-                                    else:
-                                        st.markdown("**링크**: 링크 없음")
-                                
-                                with col2:
-                                    st.markdown(f"**감성**: <span style='color: {sentiment_color}'>{item['sentiment_category']}</span>", unsafe_allow_html=True)
-                                    st.markdown(f"**점수**: {item['sentiment_score']:.3f}")
+                            # 사용된 모델 정보 표시
+                            if gpt_analysis.get('model_used'):
+                                st.info(f"🤖 사용된 모델: {gpt_analysis['model_used']}")
+                            
+                            # 감성 상태 표시
+                            sentiment_label = gpt_analysis.get('sentiment_label', '중립적')
+                            if '긍정' in sentiment_label:
+                                st.success(f"📈 전체 감성: {sentiment_label}")
+                            elif '부정' in sentiment_label:
+                                st.error(f"📉 전체 감성: {sentiment_label}")
+                            else:
+                                st.info(f"📊 전체 감성: {sentiment_label}")
+                            
+                            # GPT 분석 내용 표시
+                            st.markdown("### 📋 전문가 분석 요약")
+                            st.markdown(gpt_analysis['analysis'])
+                            
+                            st.markdown("---")
                     
-                else:
-                    # 웹 검색 실패시 기본 더미 데이터 사용
-                    st.warning("실시간 뉴스 수집에 실패했습니다. 기본 감성 분석을 표시합니다.")
-                    sentiment_data = SentimentAnalyzer.get_news_sentiment(symbol)
+                    elif openai_api_key:
+                        # API 키는 있지만 GPT 분석이 없는 경우
+                        st.warning("🤖 GPT 분석을 실행할 수 없습니다. API 키를 확인해주세요.")
                     
-                    if sentiment_data:
-                        # 기본 감성 분석 차트
-                        fig = create_sentiment_chart(sentiment_data)
-                        st.plotly_chart(fig, use_container_width=True, key=f"sentiment_chart_{symbol}")
+                    # 실제 뉴스 기사들 표시
+                    if enhanced_sentiment_data.get('news_articles'):
+                        st.subheader('📰 최신 뉴스 (실시간 수집)')
                         
-                        # 감성 요약
-                        summary = sentiment_data.get('summary', {})
-                        col1, col2, col3, col4 = st.columns(4)
+                        # 뉴스 개수와 기본 감성 요약
+                        if enhanced_sentiment_data.get('basic_sentiment'):
+                            summary = enhanced_sentiment_data['basic_sentiment']['summary']
+                            col1, col2, col3, col4 = st.columns(4)
+                            
+                            with col1:
+                                st.metric('전체 기사', summary.get('total', 0))
+                            
+                            with col2:
+                                st.metric('긍정', summary.get('positive', 0), delta_color='normal')
+                            
+                            with col3:
+                                st.metric('중립', summary.get('neutral', 0), delta_color='off')
+                            
+                            with col4:
+                                st.metric('부정', summary.get('negative', 0), delta_color='inverse')
                         
-                        with col1:
-                            st.metric('전체 기사', summary.get('total', 0))
+                        # 감성 분석 차트 (기본 분석 기준)
+                        if enhanced_sentiment_data.get('basic_sentiment'):
+                            fig = create_sentiment_chart(enhanced_sentiment_data['basic_sentiment'])
+                            st.plotly_chart(fig, use_container_width=True, key=f"sentiment_chart_{symbol}")
                         
-                        with col2:
-                            st.metric('긍정', summary.get('positive', 0), delta_color='normal')
+                        # 개별 뉴스 기사 표시
+                        st.subheader('📄 개별 뉴스 기사')
                         
-                        with col3:
-                            st.metric('중립', summary.get('neutral', 0), delta_color='off')
+                        if enhanced_sentiment_data.get('basic_sentiment'):
+                            sentiments = enhanced_sentiment_data['basic_sentiment']['sentiments']
+                            
+                            for i, item in enumerate(sentiments[:10]):  # 최대 10개 표시
+                                sentiment_color = 'green' if item['sentiment_category'] == 'Positive' else 'red' if item['sentiment_category'] == 'Negative' else 'gray'
+                                
+                                with st.expander(f"📰 {item['title'][:80]}{'...' if len(item['title']) > 80 else ''}"):
+                                    col1, col2 = st.columns([3, 1])
+                                    
+                                    with col1:
+                                        st.markdown(f"**제목**: {item['title']}")
+                                        st.markdown(f"**출처**: {item.get('source', 'Unknown')} | **시간**: {item.get('time', 'Unknown')}")
+                                        if item.get('link') and item['link'] != '#':
+                                            st.markdown(f"**링크**: [기사 읽기]({item['link']})")
+                                        else:
+                                            st.markdown("**링크**: 링크 없음")
+                                    
+                                    with col2:
+                                        st.markdown(f"**감성**: <span style='color: {sentiment_color}'>{item['sentiment_category']}</span>", unsafe_allow_html=True)
+                                        st.markdown(f"**점수**: {item['sentiment_score']:.3f}")
                         
-                        with col4:
-                            st.metric('부정', summary.get('negative', 0), delta_color='inverse')
+                    else:
+                        # 웹 검색 실패시 기본 더미 데이터 사용
+                        st.warning("실시간 뉴스 수집에 실패했습니다. 기본 감성 분석을 표시합니다.")
+                        sentiment_data = SentimentAnalyzer.get_news_sentiment(symbol)
                         
-                        # 개별 기사 감성 (더미 데이터)
-                        st.subheader('개별 뉴스 감성 (샘플 데이터)')
-                        sentiments = sentiment_data.get('sentiments', [])
-                        for i, item in enumerate(sentiments[:5]):
-                            sentiment_color = 'green' if item['sentiment_category'] == 'Positive' else 'red' if item['sentiment_category'] == 'Negative' else 'gray'
-                            st.markdown(f"**{item['title']}**")
-                            st.markdown(f"감성: <span style='color: {sentiment_color}'>{item['sentiment_category']}</span> (점수: {item['sentiment_score']:.3f})", unsafe_allow_html=True)
-                            st.markdown('---')
-        
-        # 사용법 안내
-        with st.expander('💡 GPT 뉴스 분석 사용법'):
-            st.markdown("""
-            **🔑 OpenAI API 키 설정**
-            1. [OpenAI 홈페이지](https://platform.openai.com/api-keys)에서 API 키 발급
-            2. 위의 입력창에 API 키 입력
-            3. 실시간 뉴스 수집 및 GPT 분석 자동 실행
+                        if sentiment_data:
+                            # 기본 감성 분석 차트
+                            fig = create_sentiment_chart(sentiment_data)
+                            st.plotly_chart(fig, use_container_width=True, key=f"sentiment_chart_{symbol}")
+                            
+                            # 감성 요약
+                            summary = sentiment_data.get('summary', {})
+                            col1, col2, col3, col4 = st.columns(4)
+                            
+                            with col1:
+                                st.metric('전체 기사', summary.get('total', 0))
+                            
+                            with col2:
+                                st.metric('긍정', summary.get('positive', 0), delta_color='normal')
+                            
+                            with col3:
+                                st.metric('중립', summary.get('neutral', 0), delta_color='off')
+                            
+                            with col4:
+                                st.metric('부정', summary.get('negative', 0), delta_color='inverse')
+                            
+                            # 개별 기사 감성 (더미 데이터)
+                            st.subheader('개별 뉴스 감성 (샘플 데이터)')
+                            sentiments = sentiment_data.get('sentiments', [])
+                            for i, item in enumerate(sentiments[:5]):
+                                sentiment_color = 'green' if item['sentiment_category'] == 'Positive' else 'red' if item['sentiment_category'] == 'Negative' else 'gray'
+                                st.markdown(f"**{item['title']}**")
+                                st.markdown(f"감성: <span style='color: {sentiment_color}'>{item['sentiment_category']}</span> (점수: {item['sentiment_score']:.3f})", unsafe_allow_html=True)
+                                st.markdown('---')
             
-            **📊 제공 기능**
-            - **실시간 뉴스 수집**: Google 뉴스에서 최신 기사 수집
-            - **GPT 전문 분석**: AI 기반 심층 감성 및 시장 분석
-            - **기사 링크**: 원문 기사로 바로 이동 가능
-            - **종합 투자 조언**: 뉴스 기반 투자 시사점 제공
-            
-            **⚠️ 주의사항**
-            - API 키가 없어도 기본 감성 분석은 가능합니다
-            - GPT 분석은 OpenAI 사용량에 따라 과금됩니다
-            - 실시간 뉴스 수집은 네트워크 상황에 따라 다를 수 있습니다
-            """)
-        
+            # 사용법 안내
+            with st.expander('💡 GPT 뉴스 분석 사용법'):
+                st.markdown("""
+                **🔑 OpenAI API 키 설정**
+                1. [OpenAI 홈페이지](https://platform.openai.com/api-keys)에서 API 키 발급
+                2. 위의 입력창에 API 키 입력
+                3. 실시간 뉴스 수집 및 GPT 분석 자동 실행
+                
+                **📊 제공 기능**
+                - **실시간 뉴스 수집**: Google 뉴스에서 최신 기사 수집
+                - **GPT 전문 분석**: AI 기반 심층 감성 및 시장 분석
+                - **기사 링크**: 원문 기사로 바로 이동 가능
+                - **종합 투자 조언**: 뉴스 기반 투자 시사점 제공
+                
+                **⚠️ 주의사항**
+                - API 키가 없어도 기본 감성 분석은 가능합니다
+                - GPT 분석은 OpenAI 사용량에 따라 과금됩니다
+                - 실시간 뉴스 수집은 네트워크 상황에 따라 다를 수 있습니다
+                """)        
     
     with tab5:
         st.header('💰 재무 건전성 분석')
@@ -3559,22 +3706,21 @@ def main():
         
         # OpenAI API 키 입력 섹션 추가
         st.subheader('🔧 GPT 재무 분석 설정 (선택사항)')
-        col1, col2 = st.columns([2, 1])
+        col1, col2 = st.columns(2)
         
         with col1:
-            financial_openai_api_key = st.text_input(
-                "OpenAI API 키 (GPT 기반 재무 분석을 위해 필요)",
-                type="password",
-                help="GPT를 이용한 전문가 수준의 재무 분석을 원하시면 OpenAI API 키를 입력하세요.",
-                key="financial_api_key"
+            # 모델 선택
+            financial_model = GPTModelConfig.get_model_selector(
+                key_prefix="financial",
+                help_text="재무 분석에 사용할 GPT 모델을 선택하세요."
             )
         
         with col2:
-            if financial_openai_api_key:
-                if financial_openai_api_key.startswith('sk-') and len(financial_openai_api_key) > 20:
-                    st.success("✅ API 키 활성화")
-                else:
-                    st.error("❌ 잘못된 API 키")
+            # API 키 입력
+            financial_openai_api_key = GPTModelConfig.get_api_key_input(
+                key_prefix="financial",
+                help_text="재무 분석을 위한 OpenAI API 키"
+            )
         
         for symbol in symbols:
             st.subheader(f'{symbol} 재무 분석')
@@ -3592,6 +3738,40 @@ def main():
                         # GPT 기반 재무 분석 (API 키가 있는 경우)
                         if financial_openai_api_key:
                             st.subheader('🤖 AI 재무 전문가 분석')
+                            
+                            with st.spinner('GPT가 재무 지표를 분석하는 중...'):
+                                # 기존: gpt_analysis = FinancialAnalyzer.analyze_financial_metrics_with_gpt(metrics, financial_history, symbol, financial_openai_api_key)
+                                # 수정:
+                                gpt_analysis = FinancialAnalyzer.analyze_financial_metrics_with_gpt(
+                                    metrics, financial_history, symbol, financial_openai_api_key, financial_model
+                                )
+                            
+                            if gpt_analysis.get('error'):
+                                st.error(f"🤖 GPT 분석 오류: {gpt_analysis['error']}")
+                                st.info("💡 기본 재무 분석으로 진행합니다.")
+                            else:
+                                # GPT 분석 성공
+                                score = gpt_analysis.get('score', 3.0)
+                                grade_info = FinancialAnalyzer.get_financial_grade(score)
+                                
+                                # 사용된 모델 정보 표시 (새로 추가)
+                                if gpt_analysis.get('model_used'):
+                                    st.info(f"🤖 사용된 모델: {gpt_analysis['model_used']}")
+        
+        for symbol in symbols:
+            
+            with st.spinner(f'{symbol} 재무 데이터를 분석하는 중...'):
+                financial_data = DataManager.get_financial_data(symbol)
+                
+                if financial_data:
+                    metrics = FinancialAnalyzer.calculate_financial_metrics(financial_data)
+                    
+                    if metrics:
+                        # 3개년 재무 실적 데이터 가져오기
+                        financial_history = EconomicIndicatorAnalyzer.get_financial_history(symbol)
+                        
+                        # GPT 기반 재무 분석 (API 키가 있는 경우)
+                        if financial_openai_api_key:
                             
                             with st.spinner('GPT가 재무 지표를 분석하는 중...'):
                                 gpt_analysis = FinancialAnalyzer.analyze_financial_metrics_with_gpt(
@@ -3955,22 +4135,43 @@ def main():
         st.subheader('🤖 AI 기반 종합 경제환경 분석')
 
         # API 키 입력
-        col1, col2 = st.columns([3, 1])
-
+        col1, col2 = st.columns(2)
+        
         with col1:
-            economic_openai_api_key = st.text_input(
-                "OpenAI API 키 (GPT 기반 종합 경제 분석을 위해 필요)",
-                type="password",
-                help="GPT를 이용한 전문가 수준의 경제환경 분석을 원하시면 OpenAI API 키를 입력하세요.",
-                key="economic_analysis_api_key"
+            # 모델 선택
+            economic_model = GPTModelConfig.get_model_selector(
+                key_prefix="economic",
+                help_text="경제 분석에 사용할 GPT 모델을 선택하세요."
+            )
+        
+        with col2:
+            # API 키 입력
+            economic_openai_api_key = GPTModelConfig.get_api_key_input(
+                key_prefix="economic",
+                help_text="경제 분석을 위한 OpenAI API 키"
             )
 
-        with col2:
-            if economic_openai_api_key:
-                if economic_openai_api_key.startswith('sk-') and len(economic_openai_api_key) > 20:
-                    st.success("✅ API 키 활성화")
+        # 분석 시작 버튼 부분에서
+        if economic_openai_api_key and indicators:
+            if st.button("🚀 종합 경제환경 분석 시작", use_container_width=True, type="primary"):
+                with st.spinner('📊 GPT가 모든 경제지표를 종합 분석하는 중...'):
+                    # 기존: gpt_economic_analysis = EconomicIndicatorAnalyzer.analyze_economic_indicators_with_gpt(indicators, economic_openai_api_key)
+                    # 수정:
+                    gpt_economic_analysis = EconomicIndicatorAnalyzer.analyze_economic_indicators_with_gpt(
+                        indicators, economic_openai_api_key, economic_model
+                    )
+                
+                if gpt_economic_analysis.get('error'):
+                    st.error(f"🤖 분석 오류: {gpt_economic_analysis['error']}")
                 else:
-                    st.error("❌ 잘못된 API 키")
+                    # 분석 결과 표시
+                    score = gpt_economic_analysis.get('score', 3.0)
+                    environment = gpt_economic_analysis.get('environment', '중립적')
+                    env_color = gpt_economic_analysis.get('environment_color', 'warning')
+                    
+                    # 사용된 모델 정보 표시 (새로 추가)
+                    if gpt_economic_analysis.get('model_used'):
+                        st.info(f"🤖 사용된 모델: {gpt_economic_analysis['model_used']}")
 
         # 분석 시작 버튼
         if economic_openai_api_key and indicators:
@@ -4190,12 +4391,21 @@ def main():
         
         # OpenAI API 키 입력
         st.subheader('🔧 GPT 요약 설정 (선택사항)')
-        openai_api_key = st.text_input(
-            "OpenAI API 키 (영상 요약을 위해 필요)",
-            type="password",
-            help="GPT를 이용한 영상 요약을 원하시면 OpenAI API 키를 입력하세요.",
-            key="youtube_api_key"
-        )
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # 모델 선택
+            youtube_model = GPTModelConfig.get_model_selector(
+                key_prefix="youtube",
+                help_text="유튜브 영상 요약에 사용할 GPT 모델을 선택하세요."
+            )
+        
+        with col2:
+            # API 키 입력
+            openai_api_key = GPTModelConfig.get_api_key_input(
+                key_prefix="youtube",
+                help_text="유튜브 영상 요약을 위한 OpenAI API 키"
+            )
         
         # 검색 섹션
         st.subheader('🔍 유튜브 검색')
@@ -4377,7 +4587,7 @@ def main():
                         with col1:
                             # 썸네일 - 크기 최대로 증가
                             try:
-                                st.image(video['thumbnail_url'], width=480)
+                                st.image(video['thumbnail_url'], width=320)
                             except:
                                 st.error("썸네일 로드 실패")
                         
@@ -4476,9 +4686,9 @@ def main():
                     col1, col2, col3 = st.columns([1, 2, 1])
                     
                     with col1:
-                        # 영상 정보 (썸네일 크기 조정 - 클라우드 환경 최적화)
+                        # 영상 정보 (썸네일 크기 유지)
                         try:
-                            st.image(video['thumbnail_url'], width=320)  # 480에서 280으로 축소
+                            st.image(video['thumbnail_url'], width=480)  # 원래 크기 유지
                         except:
                             st.error("썸네일 로드 실패")
                         
@@ -4495,6 +4705,11 @@ def main():
                             
                             if summary_data['type'] == 'gpt_summary':
                                 st.subheader("🤖 AI 요약 분석")
+
+                                # 사용된 모델 정보 표시 (새로 추가)
+                                if summary_data.get('model_used'):
+                                    st.info(f"🤖 사용된 모델: {summary_data['model_used']}")
+
                                 if summary_data.get('error'):
                                     st.error(f"요약 실패: {summary_data['error']}")
                                 else:
@@ -4533,7 +4748,7 @@ def main():
                                             
                                             if openai_api_key and transcript and len(transcript.strip()) > 50:
                                                 summary_result = YouTubeAnalyzer.summarize_video_with_gpt(
-                                                    transcript, video['title'], openai_api_key
+                                                    transcript, video['title'], openai_api_key, youtube_model
                                                 )
                                                 
                                                 if summary_result.get('error'):
@@ -4547,6 +4762,7 @@ def main():
                                                     st.session_state.video_summaries[f"summary_{video_id}"] = {
                                                         'type': 'gpt_summary',
                                                         'content': summary_result['summary'],
+                                                        'model_used' : summary_result.get('model_used'),
                                                         'had_api_key': True
                                                     }
                                             else:
@@ -5077,23 +5293,58 @@ def main():
                                     """)
                         
                         else:
-                            # GPT 분석이 아직 안 된 경우 - Form으로 분석 실행
-                            with st.form("gpt_analysis_form", clear_on_submit=False):
                                 st.info("🤖 AI 기반 트렌드 분석을 실행하시겠습니까?")
+                        
+                        # Form 밖에서 모델 선택과 API 키 입력
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            # 모델 선택
+                            trends_model = GPTModelConfig.get_model_selector(
+                                key_prefix="trends",
+                                help_text="트렌드 분석에 사용할 GPT 모델을 선택하세요."
+                            )
+                        
+                        with col2:
+                            # API 키 입력
+                            openai_api_key = GPTModelConfig.get_api_key_input(
+                                key_prefix="trends",
+                                help_text="트렌드 분석을 위한 OpenAI API 키"
+                            )
+                        
+                        # 분석 시작 버튼 (Form 없이)
+                        if st.button(
+                            "🚀 AI 분석 시작",
+                            type="primary",
+                            use_container_width=True,
+                            key="trends_analyze_button"
+                        ):
+                            if not openai_api_key:
+                                st.error("⚠️ OpenAI API 키를 입력해주세요.")
+                            else:
+                                try:
+                                    with st.spinner('🤖 GPT 분석 중...'):
+                                        gpt_analysis = GoogleTrendsAnalyzer.analyze_trends_with_gpt(
+                                            trends_data, openai_api_key, trends_model
+                                        )
+                                    
+                                    # 결과를 세션 상태에 저장
+                                    st.session_state.gpt_trends_result = gpt_analysis
+                                    
+                                    # 사용된 모델 정보 표시
+                                    if gpt_analysis.get('model_used'):
+                                        st.success(f"✅ 분석 완료! 사용된 모델: {gpt_analysis['model_used']}")
+                                    else:
+                                        st.success("✅ 분석이 완료되었습니다! 페이지를 새로고침하지 마세요.")
+                                    
+                                    st.rerun()
+                                    
+                                except Exception as e:
+                                    error_result = {"error": f"분석 실행 중 오류: {str(e)}"}
+                                    st.session_state.gpt_trends_result = error_result
+                                    st.error(f"분석 실패: {str(e)}")
                                 
-                                openai_api_key = st.text_input(
-                                    "OpenAI API 키",
-                                    type="password",
-                                    help="GPT를 이용한 전문가 수준의 트렌드 분석"
-                                )
-                                
-                                analyze_gpt = st.form_submit_button(
-                                    "🚀 AI 분석 시작",
-                                    type="primary",
-                                    use_container_width=True
-                                )
-                                
-                                if analyze_gpt:
+                                if gpt_analysis:
                                     if not openai_api_key:
                                         st.error("⚠️ OpenAI API 키를 입력해주세요.")
                                     elif not openai_api_key.startswith('sk-'):
@@ -5102,19 +5353,37 @@ def main():
                                         try:
                                             with st.spinner('🤖 GPT 분석 중...'):
                                                 gpt_analysis = GoogleTrendsAnalyzer.analyze_trends_with_gpt(
-                                                    trends_data, openai_api_key
+                                                    trends_data, openai_api_key, trends_model
                                                 )
                                             
                                             # 결과를 세션 상태에 저장
                                             st.session_state.gpt_trends_result = gpt_analysis
                                             
-                                            st.success("✅ 분석이 완료되었습니다! 페이지를 새로고침하지 마세요.")
+                                            # 사용된 모델 정보 표시 (새로 추가)
+                                            if gpt_analysis.get('model_used'):
+                                                st.success(f"✅ 분석 완료! 사용된 모델: {gpt_analysis['model_used']}")
+                                            else:
+                                                st.success("✅ 분석이 완료되었습니다! 페이지를 새로고침하지 마세요.")
+
                                             st.rerun()  # 결과를 바로 표시하기 위해 rerun
                                             
                                         except Exception as e:
                                             error_result = {"error": f"분석 실행 중 오류: {str(e)}"}
                                             st.session_state.gpt_trends_result = error_result
                                             st.error(f"분석 실패: {str(e)}")
+
+                                # GPT 분석 결과 표시 부분에서도 모델 정보 추가:
+                            if st.session_state.gpt_trends_result:
+                                gpt_result = st.session_state.gpt_trends_result
+                                
+                                if gpt_result.get('error'):
+                                    st.error(f"🤖 분석 오류: {gpt_result['error']}")
+                                else:
+                                    st.success("🎉 GPT 분석 완료!")
+                                    
+                                    # 사용된 모델 정보 표시 (새로 추가)
+                                    if gpt_result.get('model_used'):
+                                        st.info(f"🤖 사용된 모델: {gpt_result['model_used']}")
                             
                             # API 키 없는 경우 안내
                             with st.expander('🔑 GPT 분석 없이도 확인 가능한 정보'):
@@ -5231,7 +5500,36 @@ def main():
     - 충분한 조사 후 투자 결정하세요
     - 분산 투자를 권장합니다
     """)
+
+    st.sidebar.markdown('---')
+    st.sidebar.subheader('🤖 GPT 모델 가이드')
     
+    st.sidebar.markdown("""
+    **💎 Premium Models:**
+    • GPT-5: 최고 성능, 높은 비용
+    • o3-deep-research: 심층 연구 특화
+    
+    **⚡ Efficient Models:**
+    • GPT-4.1 mini: 균형잡힌 성능/비용
+    • GPT-5 nano: 빠르고 저렴
+    
+    **🧠 Specialized Models:**
+    • o3/o3-pro: 복잡한 추론 작업
+    • GPT-4o: 멀티모달 지원
+    
+    **💡 권장사항:**
+    • 일반 분석: GPT-4.1 mini
+    • 심층 분석: GPT-5 또는 o3
+    • 빠른 분석: GPT-5 nano
+    """)
+    
+    st.sidebar.markdown("""
+    **⚠️ 주의사항:**
+    • 모델별 비용이 다름
+    • 최신 모델일수록 높은 비용
+    • API 사용량 모니터링 권장
+    """)
+
     # 푸터
     st.markdown('---')
     st.markdown(
@@ -5244,4 +5542,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
