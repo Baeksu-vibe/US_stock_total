@@ -15,14 +15,17 @@ import time
 import warnings
 import re
 from typing import Dict, List, Tuple
+import random
+import tempfile
 import json
 import openai
 from bs4 import BeautifulSoup
+import os
+import warnings
+from typing import Dict, List, Tuple
 from urllib.parse import quote
 from pytrends.request import TrendReq
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from datetime import datetime, timedelta
+
 
 warnings.filterwarnings('ignore')
 
@@ -80,24 +83,6 @@ class GPTModelConfig:
     
     # 사용 가능한 모델 목록
     MODELS = {
-        "GPT-5": {
-            "id": "gpt-5",
-            "description": "최고 성능의 최신 모델 (코딩 및 복잡한 작업에 최적)",
-            "color": "🔥",
-            "category": "premium"
-        },
-        "GPT-5 mini": {
-            "id": "gpt-5-mini", 
-            "description": "빠르고 비용 효율적인 GPT-5 버전",
-            "color": "⚡",
-            "category": "balanced"
-        },
-        "GPT-5 nano": {
-            "id": "gpt-5-nano",
-            "description": "가장 빠르고 저렴한 GPT-5 버전", 
-            "color": "💫",
-            "category": "efficient"
-        },
         "GPT-4.1": {
             "id": "gpt-4.1",
             "description": "스마트한 비추론 모델",
@@ -130,7 +115,7 @@ class GPTModelConfig:
         },
         "o3": {
             "id": "o3",
-            "description": "복잡한 작업을 위한 추론 모델 (GPT-5의 후속작)",
+            "description": "복잡한 작업을 위한 추론 모델",
             "color": "🏆",
             "category": "reasoning"
         },
@@ -1771,7 +1756,7 @@ class BuffettAnalyzer:
             return {}
 
 class YouTubeAnalyzer:
-    """유튜브 채널 검색 및 영상 요약 클래스 (향상된 버전)"""
+    """유튜브 채널 검색 및 영상 요약 클래스 (STT 기반으로 개선)"""
     
     @staticmethod
     @st.cache_data(ttl=3600)  # 1시간 캐싱
@@ -1849,9 +1834,6 @@ class YouTubeAnalyzer:
                                 # 썸네일 URL
                                 thumbnail_url = f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
                                 
-                                # 좋아요/싫어요 정보 (YouTube API 제한으로 정확하지 않을 수 있음)
-                                likes_count = 0  # 실제로는 추출하기 어려움
-                                
                                 video_results.append({
                                     'video_id': video_id,
                                     'title': title,
@@ -1862,7 +1844,6 @@ class YouTubeAnalyzer:
                                     'published_days_ago': published_days_ago,  # 필터링용 숫자값
                                     'duration': duration,
                                     'duration_seconds': duration_seconds,  # 필터링용 숫자값
-                                    'likes_count': likes_count,  # 추후 구현 가능
                                     'thumbnail_url': thumbnail_url,
                                     'video_url': f"https://www.youtube.com/watch?v={video_id}"
                                 })
@@ -1888,6 +1869,7 @@ class YouTubeAnalyzer:
             # 전체 실패시 더미 데이터 반환
             return YouTubeAnalyzer._generate_demo_videos(query, min(max_results, 20))
     
+    # 기존 파싱 메서드들 유지
     @staticmethod
     def _parse_view_count(view_text: str) -> int:
         """조회수 텍스트를 숫자로 변환"""
@@ -1895,7 +1877,6 @@ class YouTubeAnalyzer:
             if not view_text:
                 return 0
             
-            # "1.2M views" -> 1200000
             import re
             numbers = re.findall(r'[\d.]+', view_text.lower())
             if not numbers:
@@ -1920,11 +1901,10 @@ class YouTubeAnalyzer:
         """업로드 시간을 일 단위로 변환"""
         try:
             if not time_text:
-                return 999999  # 매우 오래된 것으로 처리
+                return 999999
             
             import re
             
-            # "2 days ago", "1 week ago", "3 months ago" 등 파싱
             if 'hour' in time_text or '시간' in time_text:
                 hours = re.findall(r'\d+', time_text)
                 return float(hours[0]) / 24 if hours else 0
@@ -1941,7 +1921,7 @@ class YouTubeAnalyzer:
                 years = re.findall(r'\d+', time_text)
                 return int(years[0]) * 365 if years else 365
             else:
-                return 1  # 기본값
+                return 1
         except:
             return 999999
     
@@ -1952,7 +1932,6 @@ class YouTubeAnalyzer:
             if not duration_text:
                 return 0
             
-            # "12:34" -> 754초, "1:23:45" -> 5025초
             parts = duration_text.split(':')
             total_seconds = 0
             
@@ -1970,8 +1949,6 @@ class YouTubeAnalyzer:
     @staticmethod
     def _generate_demo_videos(query: str, count: int) -> List[Dict]:
         """데모용 영상 데이터 생성"""
-        import random
-        
         demo_videos = []
         base_channels = [
             "투자왕", "주식연구소", "경제분석가", "재테크TV", "투자의신",
@@ -1993,7 +1970,6 @@ class YouTubeAnalyzer:
                 'published_days_ago': random_days,
                 'duration': f'{random_duration//60}:{random_duration%60:02d}',
                 'duration_seconds': random_duration,
-                'likes_count': random.randint(10, random_views//100),
                 'thumbnail_url': 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
                 'video_url': 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
             })
@@ -2024,166 +2000,269 @@ class YouTubeAnalyzer:
                 filtered.sort(key=lambda x: x['published_days_ago'])
             elif sort_by == 'duration':
                 filtered.sort(key=lambda x: x['duration_seconds'], reverse=True)
-            elif sort_by == 'likes':
-                filtered.sort(key=lambda x: x['likes_count'], reverse=True)
-            # 'relevance'는 기본 순서 유지
             
             return filtered
         except Exception as e:
             st.error(f"필터링 중 오류: {str(e)}")
             return videos
 
-    # 기존 메서드들은 그대로 유지
+    # ===== STT 기반 오디오 분석 메서드들 (새로 추가) =====
+    
+    @staticmethod
+    def extract_video_id(url_or_id):
+        """YouTube URL에서 비디오 ID 추출"""
+        if not url_or_id:
+            return None
+        
+        if len(url_or_id) == 11 and not ('/' in url_or_id or '.' in url_or_id):
+            return url_or_id
+        
+        patterns = [
+            r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([a-zA-Z0-9_-]{11})',
+            r'(?:youtube\.com/v/)([a-zA-Z0-9_-]{11})',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, url_or_id)
+            if match:
+                return match.group(1)
+        
+        return None
+
+    @staticmethod
+    def get_video_metadata(video_id: str) -> Dict:
+        """영상 메타데이터 추출"""
+        try:
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            
+            response = requests.get(url, headers=headers, timeout=15)
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # 제목 추출
+            title_tag = soup.find('title')
+            title = title_tag.get_text().replace(' - YouTube', '').strip() if title_tag else 'Unknown'
+            
+            # 설명 추출
+            description_tag = soup.find('meta', {'name': 'description'})
+            description = description_tag.get('content', '') if description_tag else ''
+            
+            return {
+                'title': title,
+                'description': description,
+                'url': url,
+                'thumbnail_url': f'https://img.youtube.com/vi/{video_id}/maxresdefault.jpg'
+            }
+            
+        except Exception as e:
+            return {'error': str(e)}
+
+    @staticmethod
+    def transcribe_audio_with_whisper(video_id: str, whisper_model: str = 'base') -> Dict:
+        """Whisper를 사용한 오디오 STT 처리 - Streamlit 최적화"""
+        try:
+            # Whisper 경고 억제
+            warnings.filterwarnings("ignore", message="FP16 is not supported on CPU")
+            warnings.filterwarnings("ignore", category=UserWarning, module="whisper")
+            
+            # 필요한 라이브러리 확인
+            try:
+                import yt_dlp
+                import whisper
+            except ImportError as e:
+                return {
+                    'error': f'필수 라이브러리 미설치: {str(e)}',
+                    'solution': 'pip install yt-dlp openai-whisper 실행 후 재시도'
+                }
+            
+            # ffmpeg 확인
+            import shutil
+            if not shutil.which('ffmpeg'):
+                return {
+                    'error': 'ffmpeg가 설치되지 않았습니다.',
+                    'solution': 'choco install ffmpeg 또는 https://ffmpeg.org/download.html 에서 설치'
+                }
+
+            with tempfile.TemporaryDirectory() as temp_dir:
+                video_url = f"https://www.youtube.com/watch?v={video_id}"
+                
+                # yt-dlp 설정 (Streamlit 최적화)
+                ydl_opts = {
+                    'format': 'bestaudio[ext=m4a]/bestaudio/best',
+                    'outtmpl': os.path.join(temp_dir, f'{video_id}.%(ext)s'),
+                    'noplaylist': True,
+                    'extract_flat': False,
+                    'quiet': True,
+                    'no_warnings': True,
+                    'extractaudio': True,
+                    'audioformat': 'wav',
+                    'audioquality': '192K',
+                }
+                
+                # Step 1: 오디오 다운로드
+                try:
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        info = ydl.extract_info(video_url, download=False)
+                        duration = info.get('duration', 0)
+                        
+                        # 20분 제한 (필요시 조정 가능)
+                        if duration > 1200:
+                            return {
+                                'error': f'영상이 너무 깁니다 ({duration//60}분)',
+                                'solution': '20분 이하 영상을 선택하거나 제한을 늘려주세요.'
+                            }
+                        
+                        # 실제 다운로드
+                        ydl.download([video_url])
+                        
+                        # 다운로드된 파일 찾기
+                        downloaded_file = None
+                        for file in os.listdir(temp_dir):
+                            if file.startswith(video_id):
+                                downloaded_file = os.path.join(temp_dir, file)
+                                break
+                        
+                        if not downloaded_file or not os.path.exists(downloaded_file):
+                            return {
+                                'error': '오디오 파일 다운로드 실패',
+                                'solution': '네트워크 확인 후 다른 영상으로 시도하세요.'
+                            }
+                        
+                        file_size = os.path.getsize(downloaded_file)
+                        if file_size < 1000:  # 1KB 미만
+                            return {
+                                'error': '다운로드된 오디오 파일이 손상되었습니다',
+                                'solution': '다른 영상을 선택하거나 재시도하세요.'
+                            }
+                        
+                except Exception as e:
+                    return {
+                        'error': f'오디오 다운로드 실패: {str(e)}',
+                        'solution': '네트워크 상태 확인 후 재시도하거나 다른 영상 선택'
+                    }
+                
+                # Step 2: Whisper 음성 인식
+                try:
+                    # Whisper 모델 로딩 (캐시 활용)
+                    model = whisper.load_model(whisper_model)
+                    
+                    # 음성 인식 실행
+                    result = model.transcribe(downloaded_file, language=None, verbose=False)
+                    
+                    return {
+                        'success': True,
+                        'text': result['text'],
+                        'language': result['language'],
+                        'segments': result.get('segments', []),
+                        'segments_count': len(result.get('segments', [])),
+                        'file_size_mb': file_size / (1024 * 1024),
+                        'duration_minutes': duration / 60 if duration else 0,
+                        'whisper_model': whisper_model
+                    }
+                    
+                except Exception as e:
+                    return {
+                        'error': f'Whisper 음성 인식 실패: {str(e)}',
+                        'solution': '더 작은 모델(tiny)을 시도하거나 짧은 영상으로 테스트하세요.'
+                    }
+                    
+        except Exception as e:
+            return {
+                'error': f'STT 처리 중 예외 발생: {str(e)}',
+                'solution': '시스템 재시작 후 재시도하거나 기술지원에 문의하세요.'
+            }
+
     @staticmethod
     def get_video_transcript(video_id: str) -> str:
-        """유튜브 영상 자막 추출 (실제 구현)"""
+        """STT 기반 영상 전사 텍스트 추출 (기존 메서드 대체)"""
         try:
-            # youtube-transcript-api 설치 확인 및 실제 자막 추출
-            try:
-                from youtube_transcript_api import YouTubeTranscriptApi
-                from youtube_transcript_api.formatters import TextFormatter
+            # Step 1: 메타데이터 가져오기
+            metadata = YouTubeAnalyzer.get_video_metadata(video_id)
+            if 'error' in metadata:
+                return f"[메타데이터 오류] {metadata['error']}"
+            
+            st.info(f"🎬 영상 분석 시작: {metadata['title']}")
+            
+            # Step 2: STT 처리
+            with st.spinner('🎤 오디오 추출 및 음성 인식 중... (1-3분 소요)'):
+                stt_result = YouTubeAnalyzer.transcribe_audio_with_whisper(video_id, 'base')
+            
+            if stt_result.get('success'):
+                # 성공적인 STT 결과
+                text = stt_result['text']
+                language = stt_result['language']
+                segments_count = stt_result['segments_count']
+                duration = stt_result.get('duration_minutes', 0)
                 
-                # 자막 언어 우선순위: 한국어 → 영어 → 자동생성 자막
-                languages_to_try = [
-                    ['ko'],           # 한국어
-                    ['en'],           # 영어
-                    ['ko', 'en'],     # 한국어 또는 영어
-                    None              # 자동 생성 자막 포함
-                ]
+                st.success(f"✅ STT 완료! 언어: {language}, 구간: {segments_count}개, 길이: {duration:.1f}분")
                 
-                transcript_text = None
+                # 결과 포맷팅
+                result = f"""
+[STT 음성인식 결과]
+
+영상 정보:
+- 제목: {metadata['title']}
+- 감지된 언어: {language}
+- 인식 구간 수: {segments_count}개
+- 영상 길이: {duration:.1f}분
+
+음성인식 텍스트:
+{text}
+"""
+                return result
+            else:
+                # STT 실패 - 오류 정보 반환
+                error = stt_result.get('error', '알 수 없는 오류')
+                solution = stt_result.get('solution', '재시도하세요.')
                 
-                for languages in languages_to_try:
-                    try:
-                        if languages is None:
-                            # 자동 생성 자막 포함해서 시도
-                            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-                            
-                            # 수동 자막 우선 시도
-                            for transcript in transcript_list:
-                                if not transcript.is_generated:
-                                    transcript_data = transcript.fetch()
-                                    break
-                            else:
-                                # 수동 자막이 없으면 자동 생성 자막 사용
-                                for transcript in transcript_list:
-                                    if transcript.is_generated:
-                                        transcript_data = transcript.fetch()
-                                        break
-                                else:
-                                    continue
-                        else:
-                            # 특정 언어로 시도
-                            transcript_data = YouTubeTranscriptApi.get_transcript(
-                                video_id, 
-                                languages=languages
-                            )
-                        
-                        # 텍스트 포맷터로 정리
-                        formatter = TextFormatter()
-                        transcript_text = formatter.format_transcript(transcript_data)
-                        
-                        # 성공하면 루프 종료
-                        break
-                        
-                    except Exception:
-                        # 현재 언어/방법으로 실패하면 다음 시도
-                        continue
+                st.error(f"❌ STT 실패: {error}")
                 
-                if transcript_text:
-                    # 자막 텍스트 정리
-                    cleaned_text = transcript_text.strip()
-                    
-                    # 너무 짧은 자막은 유효하지 않다고 판단
-                    if len(cleaned_text) < 50:
-                        raise Exception("자막이 너무 짧습니다")
-                    
-                    # 자막 품질 정보 추가
-                    quality_info = ""
-                    if len(cleaned_text) > 5000:
-                        quality_info = "[고품질 자막] "
-                    elif len(cleaned_text) > 1000:
-                        quality_info = "[표준 자막] "
-                    else:
-                        quality_info = "[간단한 자막] "
-                    
-                    return quality_info + cleaned_text
-                else:
-                    raise Exception("모든 언어에서 자막 추출 실패")
-                    
-            except ImportError:
-                # youtube-transcript-api가 설치되지 않은 경우
                 return f"""
-[라이브러리 미설치] youtube-transcript-api가 설치되지 않았습니다.
+[STT 실패]
 
-실제 자막을 가져오려면 다음 명령어로 설치하세요:
-pip install youtube-transcript-api
+영상 정보:
+- 제목: {metadata['title']}
+- URL: {metadata['url']}
 
-현재는 데모 데이터로 분석됩니다:
+오류 내용: {error}
 
-이 영상에서는 {video_id}에 대한 투자 분석을 다룹니다. 
+해결 방법: {solution}
 
-주요 내용:
-1. 현재 시장 상황 및 트렌드 분석
-2. 기업의 재무 성과 및 건전성 검토  
-3. 향후 성장 전망 및 잠재적 리스크 요인
-4. 포트폴리오 구성 및 투자 전략 제안
+대안:
+1. 더 짧은 영상으로 시도
+2. 다른 영상 선택
+3. 네트워크 상태 확인
+4. ffmpeg 설치 확인
 
-전문가 의견:
-- 장기적 관점에서 긍정적인 성장 전망
-- 단기적으로는 시장 변동성에 주의 필요
-- 분산 투자를 통한 리스크 관리 권장
-- 정기적인 포트폴리오 리뷰 및 조정 필요
-
-투자 권고사항:
-- 개인의 투자 성향과 목표를 고려한 신중한 판단
-- 충분한 자료 조사 및 전문가 상담 권장
-- 투자 원금 손실 가능성에 대한 인지 필요
-
-결론:
-체계적인 분석과 신중한 접근을 통해 현명한 투자 결정을 내리시기 바랍니다.
+주의: STT 기능은 실험적 기능이며, 모든 영상에서 작동을 보장하지 않습니다.
+영상에 자막이 있는 경우 YouTube에서 직접 확인하는 것을 권장합니다.
 """
                 
         except Exception as e:
-            # 자막 추출 완전 실패 시 더미 데이터
-            error_msg = str(e)
-            
-            # 일반적인 오류 메시지들에 대한 사용자 친화적 설명
-            if "TranscriptsDisabled" in error_msg:
-                reason = "이 영상은 자막이 비활성화되어 있습니다."
-            elif "NoTranscriptFound" in error_msg:
-                reason = "이 영상에는 자막이 제공되지 않습니다."
-            elif "VideoUnavailable" in error_msg:
-                reason = "영상에 접근할 수 없습니다. (비공개 또는 삭제됨)"
-            elif "TooManyRequests" in error_msg:
-                reason = "YouTube API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요."
-            else:
-                reason = f"자막 추출 중 오류 발생: {error_msg}"
-            
+            st.error(f"❌ 전체 프로세스 실패: {str(e)}")
             return f"""
-[자막 추출 실패] {reason}
+[시스템 오류 발생]
 
-대신 영상 정보 기반 분석을 진행합니다:
+오류: {str(e)}
+
+해결 방법:
+1. 페이지 새로고침 후 재시도
+2. 다른 영상으로 테스트
+3. 시스템 재시작
+4. 필수 라이브러리 재설치:
+   pip install yt-dlp openai-whisper
 
 영상 ID: {video_id}
+영상 링크: https://www.youtube.com/watch?v={video_id}
 
-분석 방향성:
-1. 영상 제목과 채널 정보를 바탕으로 한 내용 추정
-2. 유사한 투자 분석 영상들의 일반적인 패턴 분석
-3. 현재 시장 상황을 고려한 투자 시사점 도출
-
-주의사항:
-- 실제 영상 내용과 다를 수 있음
-- 정확한 분석을 위해서는 직접 영상 시청 권장
-- 투자 결정은 여러 소스를 종합하여 판단 필요
-
-권장사항:
-영상 링크를 통해 직접 시청하시거나, 자막이 제공되는 다른 영상을 선택해보세요.
+문제가 계속되면 기존 자막 기반 분석을 사용하세요.
 """
-    
+
     @staticmethod
     def summarize_video_with_gpt(transcript: str, video_title: str, openai_api_key: str, model_id: str = "gpt-4.1-mini") -> Dict:
-        """GPT를 이용한 영상 요약 - 모델 선택 가능"""
+        """GPT를 이용한 영상 요약 - STT 텍스트 기반"""
         try:
             if not openai_api_key:
                 return {"error": "OpenAI API 키가 필요합니다."}
@@ -2191,31 +2270,73 @@ pip install youtube-transcript-api
             from openai import OpenAI
             client = OpenAI(api_key=openai_api_key)
             
+            # STT 결과에서 실제 텍스트 추출
+            stt_text = ""
+            if "[STT 음성인식 결과]" in transcript:
+                # STT 성공 케이스
+                lines = transcript.split('\n')
+                in_text_section = False
+                for line in lines:
+                    if "음성인식 텍스트:" in line:
+                        in_text_section = True
+                        continue
+                    if in_text_section:
+                        stt_text += line + "\n"
+                stt_text = stt_text.strip()
+            else:
+                # STT 실패 또는 기타 케이스
+                stt_text = transcript[:1500] if transcript else "텍스트 없음"
+            
+            if len(stt_text) < 50:
+                return {"error": "분석할 음성 텍스트가 충분하지 않습니다."}
+
             prompt = f"""
-다음은 "{video_title}" 유튜브 영상의 전체 대화 내용입니다. 이를 투자자 관점에서 요약해주세요.
+다음은 "{video_title}" 유튜브 영상의 음성인식(STT) 결과입니다. 영상에서 실제로 말한 내용을 기반으로 정확하게 요약해주세요.
 
-영상 내용:
-{transcript[:3000]}  # 토큰 제한을 위해 앞부분만 사용
+음성인식 텍스트:
+{stt_text[:3500]}
 
-다음 형식으로 요약해주세요:
+다음 형식으로 영상 내용을 요약해주세요:
 
-1. **핵심 내용 요약** (3-4줄)
-2. **주요 투자 포인트** (3개)
-3. **언급된 리스크** (있다면)
-4. **투자자를 위한 핵심 시사점** (2-3줄)
-5. **추천 여부** (추천/보류/비추천 중 하나와 이유)
+### 📺 영상 내용 요약 (STT 기반)
 
-투자 전문가 관점에서 객관적이고 실용적으로 분석해주세요.
+#### 🎯 **영상 주제 및 목적**
+- 이 영상에서 다루는 핵심 주제는 무엇인가요?
+
+#### 📋 **주요 내용 정리**
+영상에서 실제로 언급된 내용을 순서대로 정리:
+1. 첫 번째 주요 포인트
+2. 두 번째 주요 포인트  
+3. 세 번째 주요 포인트
+(실제 언급된 순서대로)
+
+#### 💡 **핵심 메시지**
+- 발표자가 전달하고자 한 가장 중요한 메시지는?
+
+#### 📊 **언급된 데이터/수치**
+- 영상에서 제시된 구체적인 숫자, 통계, 데이터가 있다면 정리
+
+#### ⚠️ **주의사항/리스크**
+- 영상에서 언급된 위험 요소나 주의점이 있다면 정리
+
+#### 🔚 **결론 및 마무리**
+- 영상의 최종 결론이나 요약 부분
+
+#### 🎤 **STT 품질 평가**
+- 음성인식 텍스트의 품질과 완성도 (상/중/하)
+- 분석 신뢰도 (높음/보통/낮음)
+
+**주의**: 영상에서 실제로 말하지 않은 내용은 추가하지 마세요. 오직 STT 텍스트에 나타난 내용만을 바탕으로 요약해주세요.
 """
 
             response = client.chat.completions.create(
-                model=model_id,  # 선택된 모델 사용
+                model=model_id,
                 messages=[
-                    {"role": "system", "content": "당신은 전문 투자 분석가입니다. 유튜브 영상 내용을 투자자 관점에서 요약하고 분석합니다."},
+                    {"role": "system", "content": "당신은 영상 내용 요약 전문가입니다. 주어진 STT(음성인식) 텍스트를 바탕으로 영상에서 실제로 언급된 내용만을 정확하게 요약합니다. 추측이나 일반적인 정보를 추가하지 않고, 오직 STT 텍스트 내용만을 요약합니다."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=800,
-                temperature=0.3
+                max_tokens=1500,
+                temperature=0.2
             )
             
             summary = response.choices[0].message.content.strip()
@@ -2223,12 +2344,13 @@ pip install youtube-transcript-api
             return {
                 "summary": summary,
                 "success": True,
-                "model_used": model_id
+                "model_used": model_id,
+                "stt_length": len(stt_text),
+                "analysis_method": "STT 기반 분석"
             }
             
         except Exception as e:
             return {"error": f"GPT 요약 실패: {str(e)}"}
-
     
 def create_stock_chart(data: pd.DataFrame, forecast: pd.DataFrame, symbol: str):
     """주가 차트 생성"""
@@ -5506,12 +5628,10 @@ def main():
     
     st.sidebar.markdown("""
     **💎 Premium Models:**
-    • GPT-5: 최고 성능, 높은 비용
     • o3-deep-research: 심층 연구 특화
     
     **⚡ Efficient Models:**
     • GPT-4.1 mini: 균형잡힌 성능/비용
-    • GPT-5 nano: 빠르고 저렴
     
     **🧠 Specialized Models:**
     • o3/o3-pro: 복잡한 추론 작업
@@ -5519,8 +5639,8 @@ def main():
     
     **💡 권장사항:**
     • 일반 분석: GPT-4.1 mini
-    • 심층 분석: GPT-5 또는 o3
-    • 빠른 분석: GPT-5 nano
+    • 심층 분석: o3
+    • 빠른 분석: GPT-4.1 nano
     """)
     
     st.sidebar.markdown("""
@@ -5542,4 +5662,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
