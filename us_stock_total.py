@@ -2285,7 +2285,7 @@ class YouTubeAnalyzer:
                 stt_text = stt_text.strip()
             else:
                 # STT 실패 또는 기타 케이스
-                stt_text = transcript[:1500] if transcript else "텍스트 없음"
+                stt_text = transcript if transcript else "텍스트 없음"
             
             if len(stt_text) < 50:
                 return {"error": "분석할 음성 텍스트가 충분하지 않습니다."}
