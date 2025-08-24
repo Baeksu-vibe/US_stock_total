@@ -3,3 +3,4 @@ pkg-config
 libhdf5-dev
 libssl-dev
 libffi-dev
+ffmpeg
